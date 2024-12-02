@@ -226,8 +226,8 @@ func (r *SearchRuleReconciler) CheckRule(ctx context.Context, resource *v1alpha1
 			r.RulesPool.Set(ruleKey, rule)
 
 			// Log and update the rule status
-			r.UpdateConditionAlertFiring(resource, "Rule is in firing state. Alert created. Current value is "+fmt.Sprintf("%v", conditionValue))
-			logger.Info(fmt.Sprintf("Rule is in firing state. Alert created. Current value is %v", conditionValue))
+			r.UpdateConditionAlertFiring(resource, "Rule is in firing state. Current value is "+fmt.Sprintf("%v", conditionValue))
+			logger.Info(fmt.Sprintf("Rule is in firing state. Current value is %v", conditionValue))
 
 			alertKey := fmt.Sprintf("%s/%s/%s", resource.Namespace, resource.Spec.ActionRef.Name, resource.Name)
 			r.AlertsPool.Set(alertKey, &pools.Alert{
@@ -235,7 +235,7 @@ func (r *SearchRuleReconciler) CheckRule(ctx context.Context, resource *v1alpha1
 				Value:      conditionValue.Float(),
 			})
 
-			err = createKubeEvent(ctx, *resource, "AlertFiring", "Rule is in firing state. Alert created. Current value is "+fmt.Sprintf("%v", conditionValue))
+			err = createKubeEvent(ctx, *resource, "AlertFiring", "Rule is in firing state. Current value is "+fmt.Sprintf("%v", conditionValue))
 			if err != nil {
 				return fmt.Errorf("error creating kube event: %v", err)
 			}

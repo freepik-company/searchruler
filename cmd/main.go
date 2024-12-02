@@ -173,6 +173,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "RulerAction")
 		os.Exit(1)
 	}
+	mgr.GetEventRecorderFor("CREATE")
 	if err = (&controller.SearchRuleReconciler{
 		Client:                        mgr.GetClient(),
 		Scheme:                        mgr.GetScheme(),

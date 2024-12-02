@@ -25,7 +25,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
 	"prosimcorp.com/SearchRuler/internal/pools"
@@ -142,5 +144,16 @@ func (r *QueryConnectorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&searchrulerv1alpha1.QueryConnector{}).
 		Named("QueryConnector").
+		WithEventFilter(predicate.Funcs{
+			CreateFunc: func(e event.CreateEvent) bool {
+				return true
+			},
+			DeleteFunc: func(e event.DeleteEvent) bool {
+				return true
+			},
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				return false
+			},
+		}).
 		Complete(r)
 }
