@@ -78,21 +78,21 @@ func (r *SearchRuleReconciler) CheckRule(ctx context.Context, resource *v1alpha1
 
 	logger := log.FromContext(ctx)
 
-	// Get SearchRulerQueryConnector associated to the rule
-	searchRulerQueryConnectorResource := &v1alpha1.SearchRulerQueryConnector{}
-	searchRulerQueryConnectorNamespacedName := types.NamespacedName{
+	// Get QueryConnector associated to the rule
+	QueryConnectorResource := &v1alpha1.QueryConnector{}
+	QueryConnectorNamespacedName := types.NamespacedName{
 		Namespace: resource.Namespace,
 		Name:      resource.Spec.QueryConnectorRef.Name,
 	}
-	err = r.Get(ctx, searchRulerQueryConnectorNamespacedName, searchRulerQueryConnectorResource)
-	if searchRulerQueryConnectorResource.Name == "" {
-		return fmt.Errorf("SearchRulerQueryConnector %s not found in the resource namespace %s", resource.Spec.QueryConnectorRef.Name, resource.Namespace)
+	err = r.Get(ctx, QueryConnectorNamespacedName, QueryConnectorResource)
+	if QueryConnectorResource.Name == "" {
+		return fmt.Errorf("QueryConnector %s not found in the resource namespace %s", resource.Spec.QueryConnectorRef.Name, resource.Namespace)
 	}
 
-	// Get credentials for SearchRulerQueryConnector attached
-	if searchRulerQueryConnectorResource.Spec.Credentials.SecretRef.Name != "" {
-		key := fmt.Sprintf("%s/%s", resource.Namespace, searchRulerQueryConnectorResource.Name)
-		queryConnectorCreds, credsExists = SearchRulerQueryConnectorCredentialsPool.Get(key)
+	// Get credentials for QueryConnector attached
+	if QueryConnectorResource.Spec.Credentials.SecretRef.Name != "" {
+		key := fmt.Sprintf("%s/%s", resource.Namespace, QueryConnectorResource.Name)
+		queryConnectorCreds, credsExists = QueryConnectorCredentialsPool.Get(key)
 		if !credsExists {
 			return fmt.Errorf("credentials not found for %s", key)
 		}
@@ -113,13 +113,13 @@ func (r *SearchRuleReconciler) CheckRule(ctx context.Context, resource *v1alpha1
 	httpClient := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: searchRulerQueryConnectorResource.Spec.TlsSkipVerify,
+				InsecureSkipVerify: QueryConnectorResource.Spec.TlsSkipVerify,
 			},
 		},
 	}
 
 	// Generate URL for search to elastic
-	searchURL := fmt.Sprintf("%s/%s/_search", searchRulerQueryConnectorResource.Spec.URL, resource.Spec.Elasticsearch.Index)
+	searchURL := fmt.Sprintf("%s/%s/_search", QueryConnectorResource.Spec.URL, resource.Spec.Elasticsearch.Index)
 	req, err := http.NewRequest("POST", searchURL, bytes.NewBuffer(elasticQuery))
 	if err != nil {
 		return fmt.Errorf("error creating request: %v", err)
@@ -127,12 +127,12 @@ func (r *SearchRuleReconciler) CheckRule(ctx context.Context, resource *v1alpha1
 
 	// Add headers and custom headers for elasticsearch queries
 	req.Header.Set("Content-Type", "application/json")
-	for key, value := range searchRulerQueryConnectorResource.Spec.Headers {
+	for key, value := range QueryConnectorResource.Spec.Headers {
 		req.Header.Set(key, value)
 	}
 
 	// Add authentication if set for elasticsearch queries
-	if searchRulerQueryConnectorResource.Spec.Credentials.SecretRef.Name != "" {
+	if QueryConnectorResource.Spec.Credentials.SecretRef.Name != "" {
 		req.SetBasicAuth(queryConnectorCreds.Username, queryConnectorCreds.Password)
 	}
 

@@ -1,10 +1,10 @@
 apiVersion: searchruler.prosimcorp.com/v1alpha1
-kind: SearchRulerQueryConnector
+kind: QueryConnector
 metadata:
   labels:
     app.kubernetes.io/name: search-ruler
     app.kubernetes.io/managed-by: kustomize
-  name: searchrulerqueryconnector-sample
+  name: queryconnector-sample
 spec:
   url: "https://127.0.0.1:9200"
   headers: {}

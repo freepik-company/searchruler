@@ -32,16 +32,16 @@ type Webhook struct {
 	Credentials Credentials       `json:"credentials,omitempty"`
 }
 
-// SearchRulerActionSpec defines the desired state of SearchRulerAction.
-type SearchRulerActionSpec struct {
+// RulerActionSpec defines the desired state of RulerAction.
+type RulerActionSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
 	Webhook Webhook `json:"webhook"`
 }
 
-// SearchRulerActionStatus defines the observed state of SearchRulerAction.
-type SearchRulerActionStatus struct {
+// RulerActionStatus defines the observed state of RulerAction.
+type RulerActionStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
@@ -51,24 +51,24 @@ type SearchRulerActionStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
-// SearchRulerAction is the Schema for the searchruleractions API.
-type SearchRulerAction struct {
+// RulerAction is the Schema for the RulerActions API.
+type RulerAction struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   SearchRulerActionSpec   `json:"spec,omitempty"`
-	Status SearchRulerActionStatus `json:"status,omitempty"`
+	Spec   RulerActionSpec   `json:"spec,omitempty"`
+	Status RulerActionStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// SearchRulerActionList contains a list of SearchRulerAction.
-type SearchRulerActionList struct {
+// RulerActionList contains a list of RulerAction.
+type RulerActionList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []SearchRulerAction `json:"items"`
+	Items           []RulerAction `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&SearchRulerAction{}, &SearchRulerActionList{})
+	SchemeBuilder.Register(&RulerAction{}, &RulerActionList{})
 }

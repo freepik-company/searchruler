@@ -14,7 +14,7 @@ resources:
   controller: true
   domain: prosimcorp.com
   group: searchruler
-  kind: SearchRulerAction
+  kind: RulerAction
   path: prosimcorp.com/SearchRuler/api/v1alpha1
   version: v1alpha1
 - api:
@@ -32,7 +32,7 @@ resources:
   controller: true
   domain: prosimcorp.com
   group: searchruler
-  kind: SearchRulerQueryConnector
+  kind: QueryConnector
   path: prosimcorp.com/SearchRuler/api/v1alpha1
   version: v1alpha1
 version: "3"

@@ -22,10 +22,10 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the Project itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
-- searchrulerqueryconnector_editor_role.yaml
-- searchrulerqueryconnector_viewer_role.yaml
+- queryconnector_editor_role.yaml
+- queryconnector_viewer_role.yaml
 - searchrule_editor_role.yaml
 - searchrule_viewer_role.yaml
-- searchruleraction_editor_role.yaml
-- searchruleraction_viewer_role.yaml
+- ruleraction_editor_role.yaml
+- ruleraction_viewer_role.yaml
 

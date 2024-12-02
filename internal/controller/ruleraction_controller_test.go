@@ -30,7 +30,7 @@ import (
 	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
 )
 
-var _ = Describe("SearchRulerQueryConnector Controller", func() {
+var _ = Describe("RulerAction Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
@@ -40,13 +40,13 @@ var _ = Describe("SearchRulerQueryConnector Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		searchrulerqueryconnector := &searchrulerv1alpha1.SearchRulerQueryConnector{}
+		RulerAction := &searchrulerv1alpha1.RulerAction{}
 
 		BeforeEach(func() {
-			By("creating the custom resource for the Kind SearchRulerQueryConnector")
-			err := k8sClient.Get(ctx, typeNamespacedName, searchrulerqueryconnector)
+			By("creating the custom resource for the Kind RulerAction")
+			err := k8sClient.Get(ctx, typeNamespacedName, RulerAction)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &searchrulerv1alpha1.SearchRulerQueryConnector{
+				resource := &searchrulerv1alpha1.RulerAction{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -59,16 +59,16 @@ var _ = Describe("SearchRulerQueryConnector Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &searchrulerv1alpha1.SearchRulerQueryConnector{}
+			resource := &searchrulerv1alpha1.RulerAction{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Cleanup the specific resource instance SearchRulerQueryConnector")
+			By("Cleanup the specific resource instance RulerAction")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
-			controllerReconciler := &SearchRulerQueryConnectorReconciler{
+			controllerReconciler := &RulerActionReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}

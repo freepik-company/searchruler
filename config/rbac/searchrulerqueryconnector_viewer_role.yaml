@@ -1,16 +1,16 @@
-# permissions for end users to view searchrulerqueryconnectors.
+# permissions for end users to view queryconnectors.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: search-ruler
     app.kubernetes.io/managed-by: kustomize
-  name: searchrulerqueryconnector-viewer-role
+  name: queryconnector-viewer-role
 rules:
 - apiGroups:
   - searchruler.prosimcorp.com
   resources:
-  - searchrulerqueryconnectors
+  - queryconnectors
   verbs:
   - get
   - list
@@ -18,6 +18,6 @@ rules:
 - apiGroups:
   - searchruler.prosimcorp.com
   resources:
-  - searchrulerqueryconnectors/status
+  - queryconnectors/status
   verbs:
   - get

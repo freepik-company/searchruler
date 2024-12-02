@@ -4,20 +4,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.4
-  name: searchruleractions.searchruler.prosimcorp.com
+  name: RulerActions.searchruler.prosimcorp.com
 spec:
   group: searchruler.prosimcorp.com
   names:
-    kind: SearchRulerAction
-    listKind: SearchRulerActionList
-    plural: searchruleractions
-    singular: searchruleraction
+    kind: RulerAction
+    listKind: RulerActionList
+    plural: RulerActions
+    singular: RulerAction
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: SearchRulerAction is the Schema for the searchruleractions API.
+        description: RulerAction is the Schema for the RulerActions API.
         properties:
           apiVersion:
             description: |-
@@ -37,7 +37,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: SearchRulerActionSpec defines the desired state of SearchRulerAction.
+            description: RulerActionSpec defines the desired state of RulerAction.
             properties:
               webhook:
                 description: WebHook TODO
@@ -82,7 +82,7 @@ spec:
             - webhook
             type: object
           status:
-            description: SearchRulerActionStatus defines the observed state of SearchRulerAction.
+            description: RulerActionStatus defines the observed state of RulerAction.
             properties:
               conditions:
                 items:

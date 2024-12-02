@@ -23,8 +23,8 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// SearchRulerQueryConnectorSpec defines the desired state of SearchRulerQueryConnector.
-type SearchRulerQueryConnectorSpec struct {
+// QueryConnectorSpec defines the desired state of QueryConnector.
+type QueryConnectorSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
@@ -34,8 +34,8 @@ type SearchRulerQueryConnectorSpec struct {
 	Credentials   Credentials       `json:"credentials,omitempty"`
 }
 
-// SearchRulerQueryConnectorStatus defines the observed state of SearchRulerQueryConnector.
-type SearchRulerQueryConnectorStatus struct {
+// QueryConnectorStatus defines the observed state of QueryConnector.
+type QueryConnectorStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
@@ -45,24 +45,24 @@ type SearchRulerQueryConnectorStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
-// SearchRulerQueryConnector is the Schema for the searchrulerqueryconnectors API.
-type SearchRulerQueryConnector struct {
+// QueryConnector is the Schema for the QueryConnectors API.
+type QueryConnector struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   SearchRulerQueryConnectorSpec   `json:"spec,omitempty"`
-	Status SearchRulerQueryConnectorStatus `json:"status,omitempty"`
+	Spec   QueryConnectorSpec   `json:"spec,omitempty"`
+	Status QueryConnectorStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// SearchRulerQueryConnectorList contains a list of SearchRulerQueryConnector.
-type SearchRulerQueryConnectorList struct {
+// QueryConnectorList contains a list of QueryConnector.
+type QueryConnectorList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []SearchRulerQueryConnector `json:"items"`
+	Items           []QueryConnector `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&SearchRulerQueryConnector{}, &SearchRulerQueryConnectorList{})
+	SchemeBuilder.Register(&QueryConnector{}, &QueryConnectorList{})
 }

@@ -1,10 +1,10 @@
 apiVersion: searchruler.prosimcorp.com/v1alpha1
-kind: SearchRulerAction
+kind: RulerAction
 metadata:
   labels:
     app.kubernetes.io/name: search-ruler
     app.kubernetes.io/managed-by: kustomize
-  name: searchruleraction-sample
+  name: ruleraction-sample
 spec:
   webhook:
     url: <URL>

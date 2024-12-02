@@ -10,30 +10,30 @@ import (
 )
 
 // SyncCredentials
-func (r *SearchRulerQueryConnectorReconciler) SyncCredentials(ctx context.Context, resource *v1alpha1.SearchRulerQueryConnector) (err error) {
+func (r *QueryConnectorReconciler) SyncCredentials(ctx context.Context, resource *v1alpha1.QueryConnector) (err error) {
 
 	// Get credentials for the queryConnector in the secret associated
 	// First get secret with the credentials
-	searchRulerQueryConnectorCredsSecret := &v1.Secret{}
+	QueryConnectorCredsSecret := &v1.Secret{}
 	namespacedName := types.NamespacedName{
 		Namespace: resource.Namespace,
 		Name:      resource.Spec.Credentials.SecretRef.Name,
 	}
-	err = r.Get(ctx, namespacedName, searchRulerQueryConnectorCredsSecret)
+	err = r.Get(ctx, namespacedName, QueryConnectorCredsSecret)
 	if err != nil {
 		return fmt.Errorf("error fetching secret %s: %v", namespacedName, err)
 	}
 
 	// Get username and password
-	username := string(searchRulerQueryConnectorCredsSecret.Data[resource.Spec.Credentials.SecretRef.KeyUsername])
-	password := string(searchRulerQueryConnectorCredsSecret.Data[resource.Spec.Credentials.SecretRef.KeyPassword])
+	username := string(QueryConnectorCredsSecret.Data[resource.Spec.Credentials.SecretRef.KeyUsername])
+	password := string(QueryConnectorCredsSecret.Data[resource.Spec.Credentials.SecretRef.KeyPassword])
 	if username == "" || password == "" {
 		return fmt.Errorf("missing credentials in secret %s", namespacedName)
 	}
 
 	// Save in pool
 	key := fmt.Sprintf("%s/%s", resource.Namespace, resource.Name)
-	SearchRulerQueryConnectorCredentialsPool.Set(key, &Credentials{
+	QueryConnectorCredentialsPool.Set(key, &Credentials{
 		Username: username,
 		Password: password,
 	})
@@ -42,11 +42,11 @@ func (r *SearchRulerQueryConnectorReconciler) SyncCredentials(ctx context.Contex
 }
 
 // DeleteCredentials
-func (r *SearchRulerQueryConnectorReconciler) DeleteCredentials(ctx context.Context, resource *v1alpha1.SearchRulerQueryConnector) (err error) {
+func (r *QueryConnectorReconciler) DeleteCredentials(ctx context.Context, resource *v1alpha1.QueryConnector) (err error) {
 
 	// Delete from global map
 	key := fmt.Sprintf("%s/%s", resource.Namespace, resource.Name)
-	SearchRulerQueryConnectorCredentialsPool.Delete(key)
+	QueryConnectorCredentialsPool.Delete(key)
 
 	return nil
 }

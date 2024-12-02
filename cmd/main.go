@@ -144,11 +144,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.SearchRulerActionReconciler{
+	if err = (&controller.RulerActionReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "SearchRulerAction")
+		setupLog.Error(err, "unable to create controller", "controller", "RulerAction")
 		os.Exit(1)
 	}
 	if err = (&controller.SearchRuleReconciler{
@@ -158,11 +158,11 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "SearchRule")
 		os.Exit(1)
 	}
-	if err = (&controller.SearchRulerQueryConnectorReconciler{
+	if err = (&controller.QueryConnectorReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "SearchRulerQueryConnector")
+		setupLog.Error(err, "unable to create controller", "controller", "QueryConnector")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

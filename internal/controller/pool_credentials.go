@@ -3,12 +3,12 @@ package controller
 import "sync"
 
 // GlobalCredentials almacena las credenciales globales
-var SearchRulerQueryConnectorCredentialsPool = &CredentialsStore{
+var QueryConnectorCredentialsPool = &CredentialsStore{
 	store: make(map[string]*Credentials),
 }
 
 // GlobalCredentials almacena las credenciales globales
-var SearchRulerActionCredentialsPool = &CredentialsStore{
+var RulerActionCredentialsPool = &CredentialsStore{
 	store: make(map[string]*Credentials),
 }
 

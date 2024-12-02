@@ -7,8 +7,8 @@ rules:
 - apiGroups:
   - searchruler.prosimcorp.com
   resources:
-  - searchruleractions
-  - searchrulerqueryconnectors
+  - QueryConnectors
+  - RulerActions
   - searchrules
   verbs:
   - create
@@ -21,16 +21,16 @@ rules:
 - apiGroups:
   - searchruler.prosimcorp.com
   resources:
-  - searchruleractions/finalizers
-  - searchrulerqueryconnectors/finalizers
+  - QueryConnectors/finalizers
+  - RulerActions/finalizers
   - searchrules/finalizers
   verbs:
   - update
 - apiGroups:
   - searchruler.prosimcorp.com
   resources:
-  - searchruleractions/status
-  - searchrulerqueryconnectors/status
+  - QueryConnectors/status
+  - RulerActions/status
   - searchrules/status
   verbs:
   - get

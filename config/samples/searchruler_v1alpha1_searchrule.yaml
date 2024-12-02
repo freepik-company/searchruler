@@ -8,14 +8,14 @@ metadata:
 spec:
   description: "Alert when there are a high error rate in the application."
 
-  # SearchRulerQueryConnector to execute queries
+  # QueryConnector to execute queries
   queryConnectorRef:
-    name: searchrulerqueryconnector-sample
+    name: queryconnector-sample
 
   # Interval time for checking the value of the query
   checkInterval: 5s
 
-  # Query to execute in the SearchRulerQueryConnector
+  # Query to execute in the QueryConnector
   elasticsearch:
     index: "kibana_sample_data_logs"
 
@@ -86,7 +86,7 @@ spec:
 
   # SearchAction item
   actionRef:
-    name: searchruleraction-sample
+    name: ruleraction-sample
     data: |
       {{- $object := .object -}}
       {{- printf "Hi, I'm on fire: %s/%s" $object.metadata.namespace $object.metadata.name -}}
