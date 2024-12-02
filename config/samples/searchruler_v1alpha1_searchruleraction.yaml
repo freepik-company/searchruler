@@ -1,0 +1,22 @@
+apiVersion: searchruler.prosimcorp.com/v1alpha1
+kind: SearchRulerAction
+metadata:
+  labels:
+    app.kubernetes.io/name: search-ruler
+    app.kubernetes.io/managed-by: kustomize
+  name: searchruleraction-sample
+spec:
+  webhook:
+    url: <URL>
+    verb: POST
+    headers: {}
+    validator: alertmanager
+    credentials:
+
+      # Interval to check secret credentials for any changes
+      #syncInterval: 1m
+      
+      secretRef:
+        name: alertmanager-credentials
+        keyUsername: username
+        keyPassword: password

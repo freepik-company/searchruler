@@ -1,0 +1,91 @@
+apiVersion: searchruler.prosimcorp.com/v1alpha1
+kind: SearchRule
+metadata:
+  labels:
+    app.kubernetes.io/name: search-ruler
+    app.kubernetes.io/managed-by: kustomize
+  name: searchrule-sample
+spec:
+  description: "Alert when there are a high error rate in the application."
+
+  # SearchRulerQueryConnector to execute queries
+  queryConnectorRef:
+    name: searchrulerqueryconnector-sample
+
+  # Interval time for checking the value of the query
+  checkInterval: 5s
+
+  # Query to execute in the SearchRulerQueryConnector
+  elasticsearch:
+    index: "kibana_sample_data_logs"
+
+    # # Response field to watch for the condition check
+    # conditionField: "aggregations.average_response_time.value"
+
+    # # Query to execute in elasticsearch in yaml format (operator transform it to json)
+    # query:
+    #   _source: [""]
+    #   query:
+    #     bool:
+    #       must:
+    #         - range:
+    #             upstream_response_time_f:
+    #               gte: 5
+    #         - range:
+    #             timestamp:
+    #               gte: "now-5m/m"
+    #               lte: "now/m"
+    #     aggs:
+    #       average_response_time:
+    #         avg:
+    #           field: "upstream_response_time_f"
+
+    query:
+      query: 
+        bool:
+          must:
+            - range:
+                response:
+                  gte: 499
+
+    # Response field to watch for the condition check
+    conditionField: "hits.total.value"
+
+    # Raw query to execute in elasticsearch in json format
+    # queryRaw: >
+    #     "_source": [""],
+    #     "query": {
+    #       "bool": {
+    #         "must": [
+    #           {
+    #             "range": {
+    #               "response_code": {
+    #                 "gte": 499
+    #               }
+    #             }
+    #           },
+    #             {
+    #               "range": {
+    #                 "timestamp": {
+    #                   "gte": "now-5m/m",
+    #                   "lte": "now/m"
+    #                 }
+    #               }
+    #             }
+    #         ]
+    #       }
+    #     }
+
+  # Condition to execute the SearchRuleAction
+  condition:
+    # greaterThan, lessThan or equal
+    operator: "greaterThan"
+    threshold: "500"
+    for: "15s"
+
+  # SearchAction item
+  actionRef:
+    name: searchruleraction-sample
+    data: |
+      {{- $object := .object -}}
+      {{- printf "Hi, I'm on fire: %s/%s" $object.metadata.namespace $object.metadata.name -}}

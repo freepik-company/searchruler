@@ -1,0 +1,23 @@
+# permissions for end users to view searchrules.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: search-ruler
+    app.kubernetes.io/managed-by: kustomize
+  name: searchrule-viewer-role
+rules:
+- apiGroups:
+  - searchruler.prosimcorp.com
+  resources:
+  - searchrules
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - searchruler.prosimcorp.com
+  resources:
+  - searchrules/status
+  verbs:
+  - get
