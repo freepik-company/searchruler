@@ -1,6 +1,8 @@
 package globals
 
 import (
+	"context"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -22,6 +24,12 @@ const (
 	// Success
 	ConditionReasonTargetSynced        = "TargetSynced"
 	ConditionReasonTargetSyncedMessage = "Target was successfully synced"
+)
+
+var (
+	Application = applicationT{
+		Context: context.Background(),
+	}
 )
 
 // NewCondition a set of default options for creating a Condition.

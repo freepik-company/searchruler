@@ -37,6 +37,7 @@ import (
 
 	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
 	"prosimcorp.com/SearchRuler/internal/controller"
+	"prosimcorp.com/SearchRuler/internal/globals"
 	"prosimcorp.com/SearchRuler/internal/pools"
 	// +kubebuilder:scaffold:imports
 )
@@ -142,6 +143,14 @@ func main() {
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
+
+	// Create and store raw Kubernetes clients from client-go
+	// They are used by kubebuilder non-related processess and controllers
+	globals.Application.KubeRawClient, globals.Application.KubeRawCoreClient, err = globals.NewKubernetesClient()
+	if err != nil {
+		setupLog.Error(err, "unable to set up kubernetes clients")
 		os.Exit(1)
 	}
 

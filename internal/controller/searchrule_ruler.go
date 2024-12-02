@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,8 +14,12 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	corev1 "k8s.io/api/core/v1"
+	eventsv1 "k8s.io/api/events/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"prosimcorp.com/SearchRuler/api/v1alpha1"
+	"prosimcorp.com/SearchRuler/internal/globals"
 	"prosimcorp.com/SearchRuler/internal/pools"
 
 	"github.com/tidwall/gjson"
@@ -62,6 +67,56 @@ func evaluateCondition(value float64, operator string, threshold string) (bool, 
 	default:
 		return false, fmt.Errorf("unknown configured operator: %q", operator)
 	}
+}
+
+// GetObjectBasicData extracts 'name' and 'namespace' from the object
+func getObjectBasicData(object *map[string]interface{}) (objectData map[string]interface{}, err error) {
+
+	metadata, ok := (*object)["metadata"].(map[string]interface{})
+	if !ok {
+		err = errors.New("metadata not found or not in expected format")
+		return
+	}
+
+	objectData = make(map[string]interface{})
+
+	objectData["apiVersion"] = (*object)["apiVersion"].(string)
+	objectData["kind"] = (*object)["kind"].(string)
+	objectData["name"] = metadata["name"]
+	objectData["namespace"] = metadata["namespace"]
+
+	return objectData, nil
+}
+
+// createKubeEvent creates a modern event in Kubernetes with data given by params
+func createKubeEvent(ctx context.Context, rule v1alpha1.SearchRule, action, message string) (err error) {
+
+	eventObj := eventsv1.Event{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "alert-",
+		},
+
+		EventTime:           metav1.NewMicroTime(time.Now()),
+		ReportingController: "searchruler",
+		ReportingInstance:   "searchrule-controller",
+		Action:              action,
+		Reason:              "AlertFiring",
+
+		Regarding: corev1.ObjectReference{
+			APIVersion: rule.APIVersion,
+			Kind:       rule.Kind,
+			Name:       rule.Name,
+			Namespace:  rule.Namespace,
+		},
+
+		Note: message,
+		Type: "Normal",
+	}
+
+	_, err = globals.Application.KubeRawCoreClient.EventsV1().Events(rule.Namespace).
+		Create(ctx, &eventObj, metav1.CreateOptions{})
+
+	return err
 }
 
 // CheckRule execute the query to the elasticsearch and evaluate the condition. Then trigger the action
@@ -199,6 +254,11 @@ func (r *SearchRuleReconciler) CheckRule(ctx context.Context, resource *v1alpha1
 				Description: resource.Spec.Description,
 			})
 
+			err = createKubeEvent(ctx, *resource, "AlertFiring", "Rule is in firing state. Alert created. Current value is "+fmt.Sprintf("%v", conditionValue))
+			if err != nil {
+				return fmt.Errorf("error creating kube event: %v", err)
+			}
+
 		}
 
 		return nil
@@ -223,6 +283,11 @@ func (r *SearchRuleReconciler) CheckRule(ctx context.Context, resource *v1alpha1
 
 			alertKey := fmt.Sprintf("%s/%s/%s", resource.Namespace, resource.Spec.ActionRef.Name, resource.Name)
 			r.AlertsPool.Delete(alertKey)
+
+			err = createKubeEvent(ctx, *resource, "AlertResolved", "Rule is in resolved state. Alert resolved. Current value is "+fmt.Sprintf("%v", conditionValue))
+			if err != nil {
+				return fmt.Errorf("error creating kube event: %v", err)
+			}
 
 			// Restore rule to default values
 			rule = &pools.Rule{
