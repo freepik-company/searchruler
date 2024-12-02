@@ -29,12 +29,15 @@ import (
 
 	"prosimcorp.com/SearchRuler/api/v1alpha1"
 	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
+	"prosimcorp.com/SearchRuler/internal/pools"
 )
 
 // RulerActionReconciler reconciles a RulerAction object
 type RulerActionReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme          *runtime.Scheme
+	CredentialsPool *pools.CredentialsStore
+	AlertsPool      *pools.AlertsStore
 }
 
 // +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=RulerActions,verbs=get;list;watch;create;update;patch;delete
@@ -82,10 +85,7 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			}
 		}
 		// Delete credentials from pool
-		err = r.DeleteCredentials(ctx, RulerActionResource)
-		if err != nil {
-			logger.Info(fmt.Sprintf("error deleting credentials from pool: %v", err.Error()))
-		}
+		r.CredentialsPool.Delete(fmt.Sprintf("%s/%s", RulerActionResource.Namespace, RulerActionResource.Name))
 
 		result = ctrl.Result{}
 		err = nil

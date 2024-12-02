@@ -7,6 +7,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"prosimcorp.com/SearchRuler/api/v1alpha1"
+	"prosimcorp.com/SearchRuler/internal/pools"
 )
 
 // SyncCredentials
@@ -33,20 +34,10 @@ func (r *QueryConnectorReconciler) SyncCredentials(ctx context.Context, resource
 
 	// Save in pool
 	key := fmt.Sprintf("%s/%s", resource.Namespace, resource.Name)
-	QueryConnectorCredentialsPool.Set(key, &Credentials{
+	r.CredentialsPool.Set(key, &pools.Credentials{
 		Username: username,
 		Password: password,
 	})
-
-	return nil
-}
-
-// DeleteCredentials
-func (r *QueryConnectorReconciler) DeleteCredentials(ctx context.Context, resource *v1alpha1.QueryConnector) (err error) {
-
-	// Delete from global map
-	key := fmt.Sprintf("%s/%s", resource.Namespace, resource.Name)
-	QueryConnectorCredentialsPool.Delete(key)
 
 	return nil
 }

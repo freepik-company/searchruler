@@ -37,6 +37,7 @@ import (
 
 	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
 	"prosimcorp.com/SearchRuler/internal/controller"
+	"prosimcorp.com/SearchRuler/internal/pools"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -144,23 +145,43 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Define pools
+	var RulerActionCredentialsPool = &pools.CredentialsStore{
+		Store: make(map[string]*pools.Credentials),
+	}
+	var QueryConnectorCredentialsPool = &pools.CredentialsStore{
+		Store: make(map[string]*pools.Credentials),
+	}
+	var RulesPool = &pools.RulesStore{
+		Store: make(map[string]*pools.Rule),
+	}
+	var AlertsPool = &pools.AlertsStore{
+		Store: make(map[string]*pools.Alert),
+	}
+
 	if err = (&controller.RulerActionReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:          mgr.GetClient(),
+		Scheme:          mgr.GetScheme(),
+		CredentialsPool: RulerActionCredentialsPool,
+		AlertsPool:      AlertsPool,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RulerAction")
 		os.Exit(1)
 	}
 	if err = (&controller.SearchRuleReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:                        mgr.GetClient(),
+		Scheme:                        mgr.GetScheme(),
+		QueryConnectorCredentialsPool: QueryConnectorCredentialsPool,
+		RulesPool:                     RulesPool,
+		AlertsPool:                    AlertsPool,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SearchRule")
 		os.Exit(1)
 	}
 	if err = (&controller.QueryConnectorReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:          mgr.GetClient(),
+		Scheme:          mgr.GetScheme(),
+		CredentialsPool: QueryConnectorCredentialsPool,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "QueryConnector")
 		os.Exit(1)

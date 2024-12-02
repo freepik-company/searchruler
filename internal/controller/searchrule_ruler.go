@@ -15,15 +15,16 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"prosimcorp.com/SearchRuler/api/v1alpha1"
+	"prosimcorp.com/SearchRuler/internal/pools"
 
 	"github.com/tidwall/gjson"
 )
 
 const (
-	ruleHealthyState         = "healthy"
-	ruleFiringState          = "firing"
-	rulePendingFiringState   = "pending_firing"
-	rulePendingResolvedState = "pending_resolved"
+	ruleHealthyState         = "Healthy"
+	ruleFiringState          = "Firing"
+	rulePendingFiringState   = "PendingFiring"
+	rulePendingResolvedState = "PendingResolved"
 
 	conditionGreaterThan        = "greaterThan"
 	conditionGreaterThanOrEqual = "greaterThanOrEqual"
@@ -33,19 +34,9 @@ const (
 )
 
 var (
-	queryConnectorCreds *Credentials
+	queryConnectorCreds *pools.Credentials
 	credsExists         bool
 )
-
-// DeleteAlertFromPool deletes the rule from the pool
-func (r *SearchRuleReconciler) DeleteRuleFromPool(ctx context.Context, resource *v1alpha1.SearchRule) (err error) {
-	alertKey := fmt.Sprintf("%s/%s", resource.Namespace, resource.Name)
-	_, alertExists := SearchRulePool.Get(alertKey)
-	if alertExists {
-		SearchRulePool.Delete(alertKey)
-	}
-	return nil
-}
 
 // evaluateCondition evaluates the conditionField with the operator and threshold
 func evaluateCondition(value float64, operator string, threshold string) (bool, error) {
@@ -92,7 +83,7 @@ func (r *SearchRuleReconciler) CheckRule(ctx context.Context, resource *v1alpha1
 	// Get credentials for QueryConnector attached
 	if QueryConnectorResource.Spec.Credentials.SecretRef.Name != "" {
 		key := fmt.Sprintf("%s/%s", resource.Namespace, QueryConnectorResource.Name)
-		queryConnectorCreds, credsExists = QueryConnectorCredentialsPool.Get(key)
+		queryConnectorCreds, credsExists = r.QueryConnectorCredentialsPool.Get(key)
 		if !credsExists {
 			return fmt.Errorf("credentials not found for %s", key)
 		}
@@ -167,14 +158,14 @@ func (r *SearchRuleReconciler) CheckRule(ctx context.Context, resource *v1alpha1
 	// Get ruleKey for the pool <namespace>/<name> and get it from the pool if exists
 	// If not, create a default skeleton rule and save it to the pool
 	ruleKey := fmt.Sprintf("%s/%s", resource.Namespace, resource.Name)
-	rule, ruleInPool := SearchRulePool.Get(ruleKey)
+	rule, ruleInPool := r.RulesPool.Get(ruleKey)
 	if !ruleInPool {
-		rule = &Rule{
-			firingTime:    time.Time{},
-			state:         ruleHealthyState,
-			resolvingTime: time.Time{},
+		rule = &pools.Rule{
+			FiringTime:    time.Time{},
+			State:         ruleHealthyState,
+			ResolvingTime: time.Time{},
 		}
-		SearchRulePool.Set(ruleKey, rule)
+		r.RulesPool.Set(ruleKey, rule)
 	}
 
 	// Get `for` duration for the rules firing. When rule is firing during this for time,
@@ -188,22 +179,25 @@ func (r *SearchRuleReconciler) CheckRule(ctx context.Context, resource *v1alpha1
 	if firing {
 
 		// If rule is not set as firing in the pool, set start fireTime and firing as true
-		if rule.state == ruleHealthyState || rule.state == rulePendingResolvedState {
-			rule.firingTime = time.Now()
-			rule.state = rulePendingFiringState
-			SearchRulePool.Set(ruleKey, rule)
+		if rule.State == ruleHealthyState || rule.State == rulePendingResolvedState {
+			rule.FiringTime = time.Now()
+			rule.State = rulePendingFiringState
+			r.RulesPool.Set(ruleKey, rule)
 		}
 
 		// If rule is firing the For time and it is not notified yet, do it
-		if time.Since(rule.firingTime) > forDuration && rule.state == rulePendingFiringState {
-			rule.state = ruleFiringState
-			SearchRulePool.Set(ruleKey, rule)
+		if time.Since(rule.FiringTime) > forDuration && rule.State == rulePendingFiringState {
+			rule.State = ruleFiringState
+			r.RulesPool.Set(ruleKey, rule)
 
 			// Log and update the rule status
 			r.UpdateConditionAlertFiring(resource, "Rule is in firing state. Alert created. Current value is "+fmt.Sprintf("%v", conditionValue))
 			logger.Info(fmt.Sprintf("Rule is in firing state. Alert created. Current value is %v", conditionValue))
 
-			// TODO trigger firing action
+			alertKey := fmt.Sprintf("%s/%s/%s", resource.Namespace, resource.Spec.ActionRef.Name, resource.Name)
+			r.AlertsPool.Set(alertKey, &pools.Alert{
+				Description: resource.Spec.Description,
+			})
 
 		}
 
@@ -211,31 +205,32 @@ func (r *SearchRuleReconciler) CheckRule(ctx context.Context, resource *v1alpha1
 	}
 
 	// If alert is not firing right now and it is not in healthy state
-	if !firing && rule.state != ruleHealthyState {
+	if !firing && rule.State != ruleHealthyState {
 
 		// If rule is not marked as resolving in the pool, do it and set start resolvingTime now
-		if rule.state != rulePendingResolvedState {
-			rule.state = rulePendingResolvedState
-			rule.resolvingTime = time.Now()
-			SearchRulePool.Set(ruleKey, rule)
+		if rule.State != rulePendingResolvedState {
+			rule.State = rulePendingResolvedState
+			rule.ResolvingTime = time.Now()
+			r.RulesPool.Set(ruleKey, rule)
 		}
 
 		// If rule stay in resoliving state during the for time or it is not notified, mark as resolved
-		if time.Since(rule.resolvingTime) > forDuration {
+		if time.Since(rule.ResolvingTime) > forDuration {
 
 			// Log and update the rule status
 			r.UpdateConditionAlertResolved(resource, "Rule is in resolved state. Alert resolved. Current value is "+fmt.Sprintf("%v", conditionValue))
 			logger.Info(fmt.Sprintf("Rule is in resolved state. Alert resolved. Current value is %v", conditionValue))
 
-			// TODO remove from alert pool
+			alertKey := fmt.Sprintf("%s/%s/%s", resource.Namespace, resource.Spec.ActionRef.Name, resource.Name)
+			r.AlertsPool.Delete(alertKey)
 
 			// Restore rule to default values
-			rule = &Rule{
-				firingTime:    time.Time{},
-				state:         ruleHealthyState,
-				resolvingTime: time.Time{},
+			rule = &pools.Rule{
+				FiringTime:    time.Time{},
+				State:         ruleHealthyState,
+				ResolvingTime: time.Time{},
 			}
-			SearchRulePool.Set(ruleKey, rule)
+			r.RulesPool.Set(ruleKey, rule)
 		}
 	}
 

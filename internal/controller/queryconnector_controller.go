@@ -29,12 +29,14 @@ import (
 
 	"prosimcorp.com/SearchRuler/api/v1alpha1"
 	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
+	"prosimcorp.com/SearchRuler/internal/pools"
 )
 
 // QueryConnectorReconciler reconciles a QueryConnector object
 type QueryConnectorReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme          *runtime.Scheme
+	CredentialsPool *pools.CredentialsStore
 }
 
 // +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=QueryConnectors,verbs=get;list;watch;create;update;patch;delete
@@ -82,10 +84,7 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			}
 		}
 		// Delete credentials from pool
-		err = r.DeleteCredentials(ctx, QueryConnectorResource)
-		if err != nil {
-			logger.Info(fmt.Sprintf("error deleting credentials from pool: %v", err.Error()))
-		}
+		r.CredentialsPool.Delete(fmt.Sprintf("%s/%s", QueryConnectorResource.Namespace, QueryConnectorResource.Name))
 
 		result = ctrl.Result{}
 		err = nil

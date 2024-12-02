@@ -7,10 +7,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"prosimcorp.com/SearchRuler/api/v1alpha1"
+	"prosimcorp.com/SearchRuler/internal/pools"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // SyncCredentials
 func (r *RulerActionReconciler) SyncCredentials(ctx context.Context, resource *v1alpha1.RulerAction) (err error) {
+
+	logger := log.FromContext(ctx)
 
 	// Get credentials for the Action in the secret associated
 	// First get secret with the credentials
@@ -33,20 +37,15 @@ func (r *RulerActionReconciler) SyncCredentials(ctx context.Context, resource *v
 
 	// Save in pool
 	key := fmt.Sprintf("%s/%s", resource.Namespace, resource.Name)
-	RulerActionCredentialsPool.Set(key, &Credentials{
+	r.CredentialsPool.Set(key, &pools.Credentials{
 		Username: username,
 		Password: password,
 	})
 
-	return nil
-}
-
-// DeleteCredentials
-func (r *RulerActionReconciler) DeleteCredentials(ctx context.Context, resource *v1alpha1.RulerAction) (err error) {
-
-	// Delete from global map
-	key := fmt.Sprintf("%s/%s", resource.Namespace, resource.Name)
-	RulerActionCredentialsPool.Delete(key)
+	alerts := r.AlertsPool.GetByRegex(fmt.Sprintf("%s/%s/*", resource.Namespace, resource.Name))
+	for _, alert := range alerts {
+		logger.Info(fmt.Sprintf("Alert: %s", alert.Description))
+	}
 
 	return nil
 }

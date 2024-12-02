@@ -29,12 +29,16 @@ import (
 
 	"prosimcorp.com/SearchRuler/api/v1alpha1"
 	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
+	"prosimcorp.com/SearchRuler/internal/pools"
 )
 
 // SearchRuleReconciler reconciles a SearchRule object
 type SearchRuleReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme                        *runtime.Scheme
+	QueryConnectorCredentialsPool *pools.CredentialsStore
+	RulesPool                     *pools.RulesStore
+	AlertsPool                    *pools.AlertsStore
 }
 
 // +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=searchrules,verbs=get;list;watch;create;update;patch;delete
@@ -82,10 +86,7 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			}
 		}
 		// Delete credentials from pool
-		err = r.DeleteRuleFromPool(ctx, searchRuleResource)
-		if err != nil {
-			logger.Info(fmt.Sprintf("error deleting rule from pool: %v", err.Error()))
-		}
+		r.RulesPool.Delete(fmt.Sprintf("%s/%s", searchRuleResource.Namespace, searchRuleResource.Name))
 
 		result = ctrl.Result{}
 		err = nil

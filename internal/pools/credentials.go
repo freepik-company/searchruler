@@ -1,16 +1,6 @@
-package controller
+package pools
 
 import "sync"
-
-// GlobalCredentials almacena las credenciales globales
-var QueryConnectorCredentialsPool = &CredentialsStore{
-	store: make(map[string]*Credentials),
-}
-
-// GlobalCredentials almacena las credenciales globales
-var RulerActionCredentialsPool = &CredentialsStore{
-	store: make(map[string]*Credentials),
-}
 
 // PlainCredentials
 type Credentials struct {
@@ -21,21 +11,21 @@ type Credentials struct {
 // CredentialsStore
 type CredentialsStore struct {
 	mu    sync.RWMutex
-	store map[string]*Credentials
+	Store map[string]*Credentials
 }
 
 // Set agrega o actualiza las credenciales
 func (c *CredentialsStore) Set(key string, creds *Credentials) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.store[key] = creds
+	c.Store[key] = creds
 }
 
 // Get obtiene las credenciales para una clave
 func (c *CredentialsStore) Get(key string) (*Credentials, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	creds, exists := c.store[key]
+	creds, exists := c.Store[key]
 	return creds, exists
 }
 
@@ -43,5 +33,8 @@ func (c *CredentialsStore) Get(key string) (*Credentials, bool) {
 func (c *CredentialsStore) Delete(key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	delete(c.store, key)
+	_, exists := c.Store[key]
+	if exists {
+		delete(c.Store, key)
+	}
 }
