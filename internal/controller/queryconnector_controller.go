@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"prosimcorp.com/SearchRuler/api/v1alpha1"
 	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
 	"prosimcorp.com/SearchRuler/internal/pools"
 )
@@ -56,7 +55,7 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	logger := log.FromContext(ctx)
 
 	// 1. Get the content of the Patch
-	QueryConnectorResource := &v1alpha1.QueryConnector{}
+	QueryConnectorResource := &searchrulerv1alpha1.QueryConnector{}
 	err = r.Get(ctx, req.NamespacedName, QueryConnectorResource)
 
 	// 2. Check existence on the cluster

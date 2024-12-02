@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"prosimcorp.com/SearchRuler/api/v1alpha1"
 	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
 	"prosimcorp.com/SearchRuler/internal/pools"
 )
@@ -58,7 +57,7 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	logger := log.FromContext(ctx)
 
 	// 1. Get the content of the Patch
-	searchRuleResource := &v1alpha1.SearchRule{}
+	searchRuleResource := &searchrulerv1alpha1.SearchRule{}
 	err = r.Get(ctx, req.NamespacedName, searchRuleResource)
 
 	// 2. Check existence on the cluster
