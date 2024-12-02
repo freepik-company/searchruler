@@ -23,13 +23,18 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+// RulerActionCredentials TODO
+type RulerActionCredentials struct {
+	SecretRef SecretRef `json:"secretRef"`
+}
+
 // WebHook TODO
 type Webhook struct {
-	Url         string            `json:"url"`
-	Verb        string            `json:"verb"`
-	Headers     map[string]string `json:"headers,omitempty"`
-	Validator   string            `json:"validator,omitempty"`
-	Credentials Credentials       `json:"credentials,omitempty"`
+	Url         string                 `json:"url"`
+	Verb        string                 `json:"verb"`
+	Headers     map[string]string      `json:"headers,omitempty"`
+	Validator   string                 `json:"validator,omitempty"`
+	Credentials RulerActionCredentials `json:"credentials,omitempty"`
 }
 
 // RulerActionSpec defines the desired state of RulerAction.
@@ -37,7 +42,8 @@ type RulerActionSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	Webhook Webhook `json:"webhook"`
+	Webhook        Webhook `json:"webhook"`
+	FiringInterval string  `json:"firingInterval"`
 }
 
 // RulerActionStatus defines the observed state of RulerAction.

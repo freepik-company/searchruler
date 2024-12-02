@@ -21,22 +21,21 @@ import (
 	"fmt"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
+	"prosimcorp.com/SearchRuler/internal/pools"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
-	"prosimcorp.com/SearchRuler/internal/pools"
 )
 
 // RulerActionReconciler reconciles a RulerAction object
 type RulerActionReconciler struct {
 	client.Client
-	Scheme          *runtime.Scheme
-	CredentialsPool *pools.CredentialsStore
-	AlertsPool      *pools.AlertsStore
+	Scheme     *runtime.Scheme
+	AlertsPool *pools.AlertsStore
 }
 
 // +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=RulerActions,verbs=get;list;watch;create;update;patch;delete
@@ -53,14 +52,27 @@ type RulerActionReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.0/pkg/reconcile
 func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
+
 	logger := log.FromContext(ctx)
+	triggeredByEvent := false
 
 	// 1. Get the content of the Patch
+
+	// 1.1 Try with RulerAction resource
 	RulerActionResource := &searchrulerv1alpha1.RulerAction{}
 	err = r.Get(ctx, req.NamespacedName, RulerActionResource)
 
-	// 2. Check existence on the cluster
+	// 1.2 If there are an error, try with Event type resource
 	if err != nil {
+		EventResource := &corev1.Event{}
+		err = r.Get(ctx, req.NamespacedName, EventResource)
+		if err != nil {
+			triggeredByEvent = true
+		}
+	}
+
+	// 2. If it is not Event or RulerAction, then check existence on the cluster
+	if err != nil && !triggeredByEvent {
 
 		// 2.1 It does NOT exist: manage removal
 		if err = client.IgnoreNotFound(err); err == nil {
@@ -74,7 +86,7 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// 3. Check if the SearchRule instance is marked to be deleted: indicated by the deletion timestamp being set
-	if !RulerActionResource.DeletionTimestamp.IsZero() {
+	if !RulerActionResource.DeletionTimestamp.IsZero() && !triggeredByEvent {
 		if controllerutil.ContainsFinalizer(RulerActionResource, resourceFinalizer) {
 			// Remove the finalizers on Patch CR
 			controllerutil.RemoveFinalizer(RulerActionResource, resourceFinalizer)
@@ -83,8 +95,6 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 				logger.Info(fmt.Sprintf(resourceFinalizersUpdateError, RulerActionResourceType, req.NamespacedName, err.Error()))
 			}
 		}
-		// Delete credentials from pool
-		r.CredentialsPool.Delete(fmt.Sprintf("%s/%s", RulerActionResource.Namespace, RulerActionResource.Name))
 
 		result = ctrl.Result{}
 		err = nil
@@ -92,7 +102,7 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// 4. Add finalizer to the SearchRule CR
-	if !controllerutil.ContainsFinalizer(RulerActionResource, resourceFinalizer) {
+	if !controllerutil.ContainsFinalizer(RulerActionResource, resourceFinalizer) && !triggeredByEvent {
 		controllerutil.AddFinalizer(RulerActionResource, resourceFinalizer)
 		err = r.Update(ctx, RulerActionResource)
 		if err != nil {
@@ -109,26 +119,23 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}()
 
 	// 6. Schedule periodical request
-	if RulerActionResource.Spec.Webhook.Credentials.SyncInterval == "" {
-		RulerActionResource.Spec.Webhook.Credentials.SyncInterval = defaultSyncInterval
-	}
-	RequeueTime, err := time.ParseDuration(RulerActionResource.Spec.Webhook.Credentials.SyncInterval)
-	if err != nil {
-		logger.Info(fmt.Sprintf(resourceSyncTimeRetrievalError, RulerActionResourceType, req.NamespacedName, err.Error()))
-		return result, err
-	}
-	result = ctrl.Result{
-		RequeueAfter: RequeueTime,
+	if !triggeredByEvent {
+		RequeueTime, err := time.ParseDuration(RulerActionResource.Spec.FiringInterval)
+		if err != nil {
+			logger.Info(fmt.Sprintf(resourceSyncTimeRetrievalError, RulerActionResourceType, req.NamespacedName, err.Error()))
+			return result, err
+		}
+		result = ctrl.Result{
+			RequeueAfter: RequeueTime,
+		}
 	}
 
 	// 7. Sync credentials if defined
-	if RulerActionResource.Spec.Webhook.Credentials.SecretRef.Name != "" {
-		err = r.SyncCredentials(ctx, RulerActionResource)
-		if err != nil {
-			r.UpdateConditionKubernetesApiCallFailure(RulerActionResource)
-			logger.Info(fmt.Sprintf(syncTargetError, RulerActionResourceType, req.NamespacedName, err.Error()))
-			return result, err
-		}
+	err = r.Sync(ctx, RulerActionResource)
+	if err != nil {
+		r.UpdateConditionKubernetesApiCallFailure(RulerActionResource)
+		logger.Info(fmt.Sprintf(syncTargetError, RulerActionResourceType, req.NamespacedName, err.Error()))
+		return result, err
 	}
 
 	// 8. Success, update the status

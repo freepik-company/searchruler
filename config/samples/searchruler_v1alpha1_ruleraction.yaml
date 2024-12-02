@@ -6,17 +6,14 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: ruleraction-sample
 spec:
+  firingInterval: 1m
   webhook:
-    url: <URL>
+    url: https://webhook.site/7688d5a6-af64-40d4-9991-01cb3b9035a7
     verb: POST
     headers: {}
     validator: alertmanager
-    credentials:
-
-      # Interval to check secret credentials for any changes
-      #syncInterval: 1m
-      
-      secretRef:
-        name: alertmanager-credentials
-        keyUsername: username
-        keyPassword: password
+    # credentials:   
+    #   secretRef:
+    #     name: alertmanager-credentials
+    #     keyUsername: username
+    #     keyPassword: password

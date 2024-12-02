@@ -155,9 +155,6 @@ func main() {
 	}
 
 	// Define pools
-	var RulerActionCredentialsPool = &pools.CredentialsStore{
-		Store: make(map[string]*pools.Credentials),
-	}
 	var QueryConnectorCredentialsPool = &pools.CredentialsStore{
 		Store: make(map[string]*pools.Credentials),
 	}
@@ -169,10 +166,9 @@ func main() {
 	}
 
 	if err = (&controller.RulerActionReconciler{
-		Client:          mgr.GetClient(),
-		Scheme:          mgr.GetScheme(),
-		CredentialsPool: RulerActionCredentialsPool,
-		AlertsPool:      AlertsPool,
+		Client:     mgr.GetClient(),
+		Scheme:     mgr.GetScheme(),
+		AlertsPool: AlertsPool,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RulerAction")
 		os.Exit(1)

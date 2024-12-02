@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -67,25 +66,6 @@ func evaluateCondition(value float64, operator string, threshold string) (bool, 
 	default:
 		return false, fmt.Errorf("unknown configured operator: %q", operator)
 	}
-}
-
-// GetObjectBasicData extracts 'name' and 'namespace' from the object
-func getObjectBasicData(object *map[string]interface{}) (objectData map[string]interface{}, err error) {
-
-	metadata, ok := (*object)["metadata"].(map[string]interface{})
-	if !ok {
-		err = errors.New("metadata not found or not in expected format")
-		return
-	}
-
-	objectData = make(map[string]interface{})
-
-	objectData["apiVersion"] = (*object)["apiVersion"].(string)
-	objectData["kind"] = (*object)["kind"].(string)
-	objectData["name"] = metadata["name"]
-	objectData["namespace"] = metadata["namespace"]
-
-	return objectData, nil
 }
 
 // createKubeEvent creates a modern event in Kubernetes with data given by params
@@ -241,7 +221,7 @@ func (r *SearchRuleReconciler) CheckRule(ctx context.Context, resource *v1alpha1
 		}
 
 		// If rule is firing the For time and it is not notified yet, do it
-		if time.Since(rule.FiringTime) > forDuration && rule.State == rulePendingFiringState {
+		if time.Since(rule.FiringTime) > forDuration {
 			rule.State = ruleFiringState
 			r.RulesPool.Set(ruleKey, rule)
 
@@ -251,7 +231,8 @@ func (r *SearchRuleReconciler) CheckRule(ctx context.Context, resource *v1alpha1
 
 			alertKey := fmt.Sprintf("%s/%s/%s", resource.Namespace, resource.Spec.ActionRef.Name, resource.Name)
 			r.AlertsPool.Set(alertKey, &pools.Alert{
-				Description: resource.Spec.Description,
+				SearchRule: *resource,
+				Value:      conditionValue.Float(),
 			})
 
 			err = createKubeEvent(ctx, *resource, "AlertFiring", "Rule is in firing state. Alert created. Current value is "+fmt.Sprintf("%v", conditionValue))

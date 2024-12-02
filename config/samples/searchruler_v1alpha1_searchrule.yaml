@@ -81,7 +81,7 @@ spec:
   condition:
     # greaterThan, greaterThanOrEqual, lessThan, lessThanOrEqual or equal
     operator: "greaterThan"
-    threshold: "500"
+    threshold: "100"
     for: "15s"
 
   # SearchAction item
@@ -89,4 +89,8 @@ spec:
     name: ruleraction-sample
     data: |
       {{- $object := .object -}}
-      {{- printf "Hi, I'm on fire: %s/%s" $object.metadata.namespace $object.metadata.name -}}
+      {{- $value := .value -}}
+      {{ printf "Hi, I'm on fire!" -}}
+      {{ printf "Name: %s" $object.Name -}}
+      {{ printf "Description: %s" $object.Spec.Description -}}
+      {{ printf "Current value: %v" $value -}}

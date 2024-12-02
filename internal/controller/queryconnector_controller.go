@@ -121,7 +121,8 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	// 7. Sync credentials if defined
-	if QueryConnectorResource.Spec.Credentials.SecretRef.Name != "" {
+	emptyCredentials := searchrulerv1alpha1.QueryConnectorCredentials{}
+	if QueryConnectorResource.Spec.Credentials != emptyCredentials {
 		err = r.SyncCredentials(ctx, QueryConnectorResource)
 		if err != nil {
 			r.UpdateConditionKubernetesApiCallFailure(QueryConnectorResource)

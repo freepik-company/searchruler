@@ -3,11 +3,14 @@ package pools
 import (
 	"regexp"
 	"sync"
+
+	"prosimcorp.com/SearchRuler/api/v1alpha1"
 )
 
 // Alert
 type Alert struct {
-	Description string
+	SearchRule v1alpha1.SearchRule
+	Value      float64
 }
 
 // AlertsStore

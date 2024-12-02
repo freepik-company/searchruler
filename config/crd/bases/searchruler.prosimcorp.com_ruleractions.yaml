@@ -39,11 +39,13 @@ spec:
           spec:
             description: RulerActionSpec defines the desired state of RulerAction.
             properties:
+              firingInterval:
+                type: string
               webhook:
                 description: WebHook TODO
                 properties:
                   credentials:
-                    description: Credentials TODO
+                    description: RulerActionCredentials TODO
                     properties:
                       secretRef:
                         description: SecretReference TODO
@@ -59,8 +61,6 @@ spec:
                         - keyUsername
                         - name
                         type: object
-                      syncInterval:
-                        type: string
                     required:
                     - secretRef
                     type: object
@@ -79,6 +79,7 @@ spec:
                 - verb
                 type: object
             required:
+            - firingInterval
             - webhook
             type: object
           status:
