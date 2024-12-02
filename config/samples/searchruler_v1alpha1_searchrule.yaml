@@ -41,6 +41,7 @@ spec:
     #           field: "upstream_response_time_f"
 
     query:
+      _source: [""]
       query: 
         bool:
           must:
@@ -78,7 +79,7 @@ spec:
 
   # Condition to execute the SearchRuleAction
   condition:
-    # greaterThan, lessThan or equal
+    # greaterThan, greaterThanOrEqual, lessThan, lessThanOrEqual or equal
     operator: "greaterThan"
     threshold: "500"
     for: "15s"

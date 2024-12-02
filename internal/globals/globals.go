@@ -13,6 +13,12 @@ const (
 	ConditionReasonKubernetesApiCallErrorType    = "KubernetesApiCallError"
 	ConditionReasonKubernetesApiCallErrorMessage = "Call to Kubernetes API failed. More info in logs."
 
+	// Alert firing and resolved status messages
+	ConditionTypeAlertFiring     = "AlertFiring"
+	ConditionReasonAlertFiring   = "AlertFiring"
+	ConditionTypeAlertResolved   = "AlertResolved"
+	ConditionReasonAlertResolved = "AlertResolved"
+
 	// Success
 	ConditionReasonTargetSynced        = "TargetSynced"
 	ConditionReasonTargetSyncedMessage = "Target was successfully synced"
@@ -52,5 +58,19 @@ func UpdateCondition(conditions *[]metav1.Condition, condition metav1.Condition)
 		currentCondition.Reason = condition.Reason
 		currentCondition.Message = condition.Message
 		currentCondition.LastTransitionTime = metav1.Now()
+	}
+}
+
+func DeleteCondition(conditions *[]metav1.Condition, condType string) {
+	index := -1
+	for i, cond := range *conditions {
+		if cond.Type == condType {
+			index = i
+			break
+		}
+	}
+
+	if index != -1 {
+		*conditions = append((*conditions)[:index], (*conditions)[index+1:]...)
 	}
 }

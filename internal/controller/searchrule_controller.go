@@ -82,9 +82,9 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			}
 		}
 		// Delete credentials from pool
-		err = r.DeleteAlertFromPool(ctx, searchRuleResource)
+		err = r.DeleteRuleFromPool(ctx, searchRuleResource)
 		if err != nil {
-			logger.Info(fmt.Sprintf("error deleting alert from pool: %v", err.Error()))
+			logger.Info(fmt.Sprintf("error deleting rule from pool: %v", err.Error()))
 		}
 
 		result = ctrl.Result{}
@@ -119,7 +119,7 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		RequeueAfter: RequeueTime,
 	}
 
-	// 7. The Patch CR already exist: manage the update
+	// 7. Check the rule
 	err = r.CheckRule(ctx, searchRuleResource)
 	if err != nil {
 		r.UpdateConditionKubernetesApiCallFailure(searchRuleResource)

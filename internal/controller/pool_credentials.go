@@ -7,6 +7,11 @@ var SearchRulerQueryConnectorCredentialsPool = &CredentialsStore{
 	store: make(map[string]*Credentials),
 }
 
+// GlobalCredentials almacena las credenciales globales
+var SearchRulerActionCredentialsPool = &CredentialsStore{
+	store: make(map[string]*Credentials),
+}
+
 // PlainCredentials
 type Credentials struct {
 	Username string

@@ -122,8 +122,7 @@ func (r *SearchRulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		RequeueAfter: RequeueTime,
 	}
 
-	// 7. The Patch CR already exist: manage the update
-	// Sync credentials if defined
+	// 7. Sync credentials if defined
 	if searchRulerActionResource.Spec.Webhook.Credentials.SecretRef.Name != "" {
 		err = r.SyncCredentials(ctx, searchRulerActionResource)
 		if err != nil {

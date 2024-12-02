@@ -122,8 +122,7 @@ func (r *SearchRulerQueryConnectorReconciler) Reconcile(ctx context.Context, req
 		RequeueAfter: RequeueTime,
 	}
 
-	// 7. The Patch CR already exist: manage the update
-	// Sync credentials if defined
+	// 7. Sync credentials if defined
 	if searchRulerQueryConnectorResource.Spec.Credentials.SecretRef.Name != "" {
 		err = r.SyncCredentials(ctx, searchRulerQueryConnectorResource)
 		if err != nil {

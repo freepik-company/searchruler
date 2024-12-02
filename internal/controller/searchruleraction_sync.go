@@ -41,7 +41,7 @@ func (r *SearchRulerActionReconciler) SyncCredentials(ctx context.Context, resou
 	return nil
 }
 
-// SyncCredentials
+// DeleteCredentials
 func (r *SearchRulerActionReconciler) DeleteCredentials(ctx context.Context, resource *v1alpha1.SearchRulerAction) (err error) {
 
 	// Delete from global map

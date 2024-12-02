@@ -2,7 +2,6 @@ package controller
 
 import (
 	"sync"
-	"time"
 )
 
 // SearchRuleAlertPool
@@ -12,11 +11,6 @@ var SearchRuleAlertPool = &AlertsStore{
 
 // Alert
 type Alert struct {
-	fireTime      time.Time
-	resolvingTime time.Time
-	notified      bool
-	resolving     bool
-	firing        bool
 }
 
 // AlertsStore
@@ -36,6 +30,12 @@ func (c *AlertsStore) Get(key string) (*Alert, bool) {
 	defer c.mu.RUnlock()
 	alert, exists := c.store[key]
 	return alert, exists
+}
+
+func (c *AlertsStore) GetAll() map[string]*Alert {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.store
 }
 
 func (c *AlertsStore) Delete(key string) {
