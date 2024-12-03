@@ -19,16 +19,18 @@ package controller
 import (
 	"context"
 	"fmt"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
 	"prosimcorp.com/SearchRuler/internal/pools"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
@@ -56,7 +58,6 @@ type RulerActionReconciler struct {
 func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
 
 	logger := log.FromContext(ctx)
-	triggeredByEvent := false
 
 	// 1. Get the content of the Patch
 
@@ -65,16 +66,31 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	err = r.Get(ctx, req.NamespacedName, RulerActionResource)
 
 	// 1.2 If there are an error, try with Event type resource
-	if err != nil {
+	if errors.IsNotFound(err) {
 		EventResource := &corev1.Event{}
 		err = r.Get(ctx, req.NamespacedName, EventResource)
-		if err != nil {
-			triggeredByEvent = true
+
+		// If the resource is an event, then get the SearchRule resource associated to the event
+		// and then the RulerAction resource associated to the SearchRule
+		if err == nil {
+			SearchRuleResource := &searchrulerv1alpha1.SearchRule{}
+			SearchRuleNamespacedName := types.NamespacedName{
+				Namespace: EventResource.InvolvedObject.Namespace,
+				Name:      EventResource.InvolvedObject.Name,
+			}
+			err = r.Get(ctx, SearchRuleNamespacedName, SearchRuleResource)
+			if err == nil {
+				RulerActionNamespacedName := types.NamespacedName{
+					Namespace: SearchRuleResource.Namespace,
+					Name:      SearchRuleResource.Spec.ActionRef.Name,
+				}
+				err = r.Get(ctx, RulerActionNamespacedName, RulerActionResource)
+			}
 		}
 	}
 
 	// 2. If it is not Event or RulerAction, then check existence on the cluster
-	if err != nil && !triggeredByEvent {
+	if err != nil {
 
 		// 2.1 It does NOT exist: manage removal
 		if err = client.IgnoreNotFound(err); err == nil {
@@ -88,7 +104,7 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// 3. Check if the SearchRule instance is marked to be deleted: indicated by the deletion timestamp being set
-	if !RulerActionResource.DeletionTimestamp.IsZero() && !triggeredByEvent {
+	if !RulerActionResource.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(RulerActionResource, resourceFinalizer) {
 			// Remove the finalizers on Patch CR
 			controllerutil.RemoveFinalizer(RulerActionResource, resourceFinalizer)
@@ -104,7 +120,7 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// 4. Add finalizer to the SearchRule CR
-	if !controllerutil.ContainsFinalizer(RulerActionResource, resourceFinalizer) && !triggeredByEvent {
+	if !controllerutil.ContainsFinalizer(RulerActionResource, resourceFinalizer) {
 		controllerutil.AddFinalizer(RulerActionResource, resourceFinalizer)
 		err = r.Update(ctx, RulerActionResource)
 		if err != nil {
@@ -118,22 +134,27 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		if err != nil {
 			logger.Info(fmt.Sprintf(resourceConditionUpdateError, RulerActionResourceType, req.NamespacedName, err.Error()))
 		}
+
 	}()
 
 	// 6. Schedule periodical request
-	if !triggeredByEvent {
-		RequeueTime, err := time.ParseDuration(RulerActionResource.Spec.FiringInterval)
-		if err != nil {
-			logger.Info(fmt.Sprintf(resourceSyncTimeRetrievalError, RulerActionResourceType, req.NamespacedName, err.Error()))
-			return result, err
-		}
-		result = ctrl.Result{
-			RequeueAfter: RequeueTime,
-		}
-	}
+	// if !triggeredByEvent {
+	// 	RequeueTime, err := time.ParseDuration(RulerActionResource.Spec.FiringInterval)
+	// 	if err != nil {
+	// 		logger.Info(fmt.Sprintf(resourceSyncTimeRetrievalError, RulerActionResourceType, req.NamespacedName, err.Error()))
+	// 		return result, err
+	// 	}
+	// 	result = ctrl.Result{
+	// 		RequeueAfter: RequeueTime,
+	// 	}
+	// }
 
 	// 7. Sync credentials if defined
 	err = r.Sync(ctx, RulerActionResource)
+	if err != nil {
+		logger.Info(fmt.Sprintf("error: %v", err.Error()))
+		return result, err
+	}
 	if err != nil {
 		r.UpdateConditionKubernetesApiCallFailure(RulerActionResource)
 		logger.Info(fmt.Sprintf(syncTargetError, RulerActionResourceType, req.NamespacedName, err.Error()))
@@ -162,5 +183,6 @@ func (r *RulerActionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return false
 			},
 		}).
+		Watches(&corev1.Event{}, &handler.EnqueueRequestForObject{}).
 		Complete(r)
 }

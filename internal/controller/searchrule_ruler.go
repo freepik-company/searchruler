@@ -70,7 +70,6 @@ func evaluateCondition(value float64, operator string, threshold string) (bool, 
 
 // createKubeEvent creates a modern event in Kubernetes with data given by params
 func createKubeEvent(ctx context.Context, rule v1alpha1.SearchRule, action, message string) (err error) {
-
 	eventObj := eventsv1.Event{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "alert-",

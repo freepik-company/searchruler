@@ -11,7 +11,26 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"prosimcorp.com/SearchRuler/api/v1alpha1"
 	"prosimcorp.com/SearchRuler/internal/template"
+	"prosimcorp.com/SearchRuler/internal/validators"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+)
+
+const (
+	//
+	HttpEventPattern = `{"data":"%s","timestamp":"%s"}`
+
+	//
+	ValidatorNotFoundErrorMessage   = "validator %s not found"
+	ValidationFailedErrorMessage    = "validation failed: %s"
+	HttpRequestCreationErrorMessage = "error creating http request: %s"
+	HttpRequestSendingErrorMessage  = "error sending http request: %s"
+)
+
+var (
+	// validatorsMap is a map of integration names and their respective validation functions
+	validatorsMap = map[string]func(data string) (result bool, hint string, err error){
+		"alertmanager": validators.ValidateAlertmanager,
+	}
 )
 
 // Sync
@@ -44,7 +63,6 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 	}
 
 	// Check alerts
-	logger.Info(fmt.Sprintf("Triggered by: %s", resource.Name))
 	alerts := r.AlertsPool.GetByRegex(fmt.Sprintf("%s/%s/*", resource.Namespace, resource.Name))
 	for _, alert := range alerts {
 
@@ -60,6 +78,25 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 		// Add headers to the request
 		for headerKey, headerValue := range resource.Spec.Webhook.Headers {
 			httpRequest.Header.Set(headerKey, headerValue)
+		}
+
+		// Check if the webhook has a validator and execute it when available
+		if resource.Spec.Webhook.Validator != "" {
+
+			_, validatorFound := validatorsMap[resource.Spec.Webhook.Validator]
+			if !validatorFound {
+				return fmt.Errorf(ValidatorNotFoundErrorMessage, resource.Spec.Webhook.Validator)
+			}
+
+			//
+			validatorResult, validatorHint, err := validatorsMap[resource.Spec.Webhook.Validator](alert.SearchRule.Spec.ActionRef.Data)
+			if err != nil {
+				return fmt.Errorf(ValidationFailedErrorMessage, err.Error())
+			}
+
+			if !validatorResult {
+				return fmt.Errorf(ValidationFailedErrorMessage, validatorHint)
+			}
 		}
 
 		// Add data to the request

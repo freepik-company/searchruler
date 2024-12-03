@@ -42,8 +42,7 @@ type RulerActionSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	Webhook        Webhook `json:"webhook"`
-	FiringInterval string  `json:"firingInterval"`
+	Webhook Webhook `json:"webhook"`
 }
 
 // RulerActionStatus defines the observed state of RulerAction.

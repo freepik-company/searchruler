@@ -13,7 +13,7 @@ spec:
     name: queryconnector-sample
 
   # Interval time for checking the value of the query
-  checkInterval: 5s
+  checkInterval: 30s
 
   # Query to execute in the QueryConnector
   elasticsearch:
@@ -82,7 +82,7 @@ spec:
     # greaterThan, greaterThanOrEqual, lessThan, lessThanOrEqual or equal
     operator: "greaterThan"
     threshold: "100"
-    for: "15s"
+    for: "1m"
 
   # SearchAction item
   actionRef:
@@ -90,7 +90,7 @@ spec:
     data: |
       {{- $object := .object -}}
       {{- $value := .value -}}
-      {{ printf "Hi, I'm on fire!" -}}
-      {{ printf "Name: %s" $object.Name -}}
-      {{ printf "Description: %s" $object.Spec.Description -}}
-      {{ printf "Current value: %v" $value -}}
+      {{ printf "Hi, I'm on fire!" }}
+      {{ printf "Name: %s" $object.Name }}
+      {{ printf "Description: %s" $object.Spec.Description }}
+      {{ printf "Current value: %v" $value }}

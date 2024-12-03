@@ -6,12 +6,13 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: ruleraction-sample
 spec:
-  firingInterval: 1m
   webhook:
-    url: https://webhook.site/7688d5a6-af64-40d4-9991-01cb3b9035a7
+    url: https://webhook.site/3f2e28af-68b2-47bd-b603-f8abcdf2ac93
     verb: POST
     headers: {}
-    validator: alertmanager
+
+    #validator: alertmanager
+
     # credentials:   
     #   secretRef:
     #     name: alertmanager-credentials
