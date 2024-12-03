@@ -19,6 +19,7 @@ package controller
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -27,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"prosimcorp.com/SearchRuler/api/v1alpha1"
+	"prosimcorp.com/SearchRuler/internal/pools"
 	"prosimcorp.com/SearchRuler/internal/template"
 	"prosimcorp.com/SearchRuler/internal/validators"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -72,12 +74,21 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 
 	// Check alert pool for alerts related to this rulerAction
 	// Alerts key pattern: namespace/rulerActionName/searchRuleName
-	alerts := r.AlertsPool.GetByRegex(fmt.Sprintf("%s/%s/*", resource.Namespace, resource.Name))
+	alerts, err := r.getRulerActionAssociatedAlerts(resource)
+	if err != nil {
+		return fmt.Errorf(AlertsPoolErrorMessage, err)
+	}
 
 	// If there are alerts for the rulerAction, initialice the HTTP client
 	if len(alerts) > 0 {
 		// Create the HTTP client
-		httpClient := &http.Client{}
+		httpClient := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: resource.Spec.Webhook.TlsSkipVerify,
+				},
+			},
+		}
 
 		// Create the request with the configured verb and URL
 		httpRequest, err := http.NewRequest(resource.Spec.Webhook.Verb, resource.Spec.Webhook.Url, nil)
@@ -104,6 +115,7 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 			logger.Info(fmt.Sprintf(
 				AlertFiringInfoMessage,
 				alert.SearchRule.Namespace,
+				alert.SearchRule.Name,
 				alert.SearchRule.Spec.Description,
 			))
 
@@ -213,4 +225,20 @@ func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, namespac
 	}
 
 	return ruleAction, nil
+}
+
+// getRulerActionAssociatedAlerts returns all alerts associated with the RulerAction
+func (r *RulerActionReconciler) getRulerActionAssociatedAlerts(resource *v1alpha1.RulerAction) (alerts []*pools.Alert, err error) {
+
+	// Get all alerts from the AlertsPool
+	alertsPool := r.AlertsPool.GetAll()
+
+	// Iterate over the alerts in the pool and check if the alert is associated with the RulerAction
+	for _, alert := range alertsPool {
+		if alert.RulerActionName == resource.Name {
+			alerts = append(alerts, alert)
+		}
+	}
+
+	return alerts, nil
 }

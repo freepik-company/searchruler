@@ -17,7 +17,6 @@ limitations under the License.
 package pools
 
 import (
-	"regexp"
 	"sync"
 
 	"prosimcorp.com/SearchRuler/api/v1alpha1"
@@ -25,8 +24,9 @@ import (
 
 // Alert
 type Alert struct {
-	SearchRule v1alpha1.SearchRule
-	Value      float64
+	RulerActionName string
+	SearchRule      v1alpha1.SearchRule
+	Value           float64
 }
 
 // AlertsStore
@@ -58,23 +58,4 @@ func (c *AlertsStore) Delete(key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.Store, key)
-}
-
-func (c *AlertsStore) GetByRegex(pattern string) map[string]*Alert {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	regex, err := regexp.Compile(pattern)
-	if err != nil {
-		return nil
-	}
-
-	matchedAlerts := make(map[string]*Alert)
-
-	for key, alert := range c.Store {
-		if regex.MatchString(key) {
-			matchedAlerts[key] = alert
-		}
-	}
-	return matchedAlerts
 }

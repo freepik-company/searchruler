@@ -27,11 +27,12 @@ type RulerActionCredentials struct {
 
 // WebHook TODO
 type Webhook struct {
-	Url         string                 `json:"url"`
-	Verb        string                 `json:"verb"`
-	Headers     map[string]string      `json:"headers,omitempty"`
-	Validator   string                 `json:"validator,omitempty"`
-	Credentials RulerActionCredentials `json:"credentials,omitempty"`
+	Url           string                 `json:"url"`
+	Verb          string                 `json:"verb"`
+	Headers       map[string]string      `json:"headers,omitempty"`
+	TlsSkipVerify bool                   `json:"tlsSkipVerify,omitempty"`
+	Validator     string                 `json:"validator,omitempty"`
+	Credentials   RulerActionCredentials `json:"credentials,omitempty"`
 }
 
 // RulerActionSpec defines the desired state of RulerAction.

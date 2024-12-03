@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -77,6 +78,10 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// 3. Check if the SearchRule instance is marked to be deleted: indicated by the deletion timestamp being set
 	if !QueryConnectorResource.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(QueryConnectorResource, resourceFinalizer) {
+
+			// 3.1 Delete the resources associated with the QueryConnector
+			err = r.Sync(ctx, watch.Deleted, QueryConnectorResource)
+
 			// Remove the finalizers on Patch CR
 			controllerutil.RemoveFinalizer(QueryConnectorResource, resourceFinalizer)
 			err = r.Update(ctx, QueryConnectorResource)
@@ -84,9 +89,6 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				logger.Info(fmt.Sprintf(resourceFinalizersUpdateError, QueryConnectorResourceType, req.NamespacedName, err.Error()))
 			}
 		}
-		// Delete credentials from pool
-		credentialsKey := fmt.Sprintf("%s/%s", QueryConnectorResource.Namespace, QueryConnectorResource.Name)
-		r.CredentialsPool.Delete(credentialsKey)
 
 		result = ctrl.Result{}
 		err = nil
@@ -125,7 +127,7 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// 7. Sync credentials if defined
 	if !reflect.ValueOf(QueryConnectorResource.Spec.Credentials).IsZero() {
-		err = r.Sync(ctx, QueryConnectorResource)
+		err = r.Sync(ctx, watch.Modified, QueryConnectorResource)
 		if err != nil {
 			r.UpdateConditionKubernetesApiCallFailure(QueryConnectorResource)
 			logger.Info(fmt.Sprintf(syncTargetError, QueryConnectorResourceType, req.NamespacedName, err.Error()))

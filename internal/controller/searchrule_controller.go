@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -78,6 +79,10 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// 3. Check if the SearchRule instance is marked to be deleted: indicated by the deletion timestamp being set
 	if !searchRuleResource.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(searchRuleResource, resourceFinalizer) {
+
+			// 3.1 Delete the resources associated with the SearchRule
+			err = r.Sync(ctx, watch.Deleted, searchRuleResource)
+
 			// Remove the finalizers on Patch CR
 			controllerutil.RemoveFinalizer(searchRuleResource, resourceFinalizer)
 			err = r.Update(ctx, searchRuleResource)
@@ -85,8 +90,6 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				logger.Info(fmt.Sprintf(resourceFinalizersUpdateError, SearchRuleResourceType, req.NamespacedName, err.Error()))
 			}
 		}
-		// Delete credentials from pool
-		r.RulesPool.Delete(fmt.Sprintf("%s/%s", searchRuleResource.Namespace, searchRuleResource.Name))
 
 		result = ctrl.Result{}
 		err = nil
@@ -121,7 +124,7 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// 7. Check the rule
-	err = r.Sync(ctx, searchRuleResource)
+	err = r.Sync(ctx, watch.Modified, searchRuleResource)
 	if err != nil {
 		r.UpdateConditionKubernetesApiCallFailure(searchRuleResource)
 		logger.Info(fmt.Sprintf(syncTargetError, SearchRuleResourceType, req.NamespacedName, err.Error()))

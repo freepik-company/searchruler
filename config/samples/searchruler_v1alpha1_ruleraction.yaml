@@ -17,6 +17,9 @@ spec:
     # HTTP method to send the webhook message
     verb: POST
 
+    # Skip certificate verification if the connection is HTTPS
+    tlsSkipVerify: false
+
     # Additional headers if needed for the connection
     headers: {}
 

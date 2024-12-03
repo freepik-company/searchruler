@@ -22,13 +22,22 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	"prosimcorp.com/SearchRuler/api/v1alpha1"
 	"prosimcorp.com/SearchRuler/internal/pools"
 )
 
 // Sync function is used to synchronize the QueryConnector resource with the credentials. Adds the credentials to the
 // credentials pool to be used in SearchRule resources. Just executed when the resource has a secretRef defined.
-func (r *QueryConnectorReconciler) Sync(ctx context.Context, resource *v1alpha1.QueryConnector) (err error) {
+func (r *QueryConnectorReconciler) Sync(ctx context.Context, eventType watch.EventType, resource *v1alpha1.QueryConnector) (err error) {
+
+	// If the eventType is Deleted, remove the credentials from the pool
+	// In other cases get the credentials from the secret and add them to the pool
+	if eventType == watch.Deleted {
+		credentialsKey := fmt.Sprintf("%s/%s", resource.Namespace, resource.Name)
+		r.CredentialsPool.Delete(credentialsKey)
+		return nil
+	}
 
 	// Get credentials for the queryConnector in the secret associated
 	// First get secret with the credentials. The secret must be in the same

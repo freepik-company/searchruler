@@ -45,8 +45,10 @@ const (
 	ConditionReasonStateSuccessMessage = "Success executing tasks"
 
 	// Alert firing and resolved status messages
-	ConditionReasonAlertFiring   = "AlertFiring"
-	ConditionReasonAlertResolved = "AlertResolved"
+	ConditionReasonAlertFiring          = "AlertFiring"
+	ConditionReasonAlertFiringMessage   = "Alert is firing"
+	ConditionReasonAlertResolved        = "AlertResolved"
+	ConditionReasonAlertResolvedMessage = "Alert is resolved"
 
 	// No credentials found
 	ConditionReasonNoCredsFoundType    = "NoCredsFound"
@@ -59,6 +61,18 @@ const (
 	// Evaluate template error
 	ConditionReasonEvaluateTemplateErrorType    = "EvaluateTemplateError"
 	ConditionReasonEvaluateTemplateErrorMessage = "Error evaluating the template for the alert"
+
+	// QueryConnector not found
+	ConditionReasonQueryConnectorNotFoundType    = "QueryConnectorNotFound"
+	ConditionReasonQueryConnectorNotFoundMessage = "QueryConnector not found"
+
+	// No query found in the SearchRule
+	ConditionReasonNoQueryFoundMessage = "No query found in the SearchRule"
+	ConditionReasonNoQueryFoundType    = "NoQueryFound"
+
+	// Query error
+	ConditionReasonQueryErrorMessage = "Error executing the query"
+	ConditionReasonQueryErrorType    = "QueryError"
 )
 
 var (

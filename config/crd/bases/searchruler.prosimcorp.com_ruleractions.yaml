@@ -66,6 +66,8 @@ spec:
                     additionalProperties:
                       type: string
                     type: object
+                  tlsSkipVerify:
+                    type: boolean
                   url:
                     type: string
                   validator:
