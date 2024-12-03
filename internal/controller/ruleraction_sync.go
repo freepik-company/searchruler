@@ -1,3 +1,19 @@
+/*
+Copyright 2024.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package controller
 
 import (
@@ -6,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -15,17 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-const (
-	//
-	HttpEventPattern = `{"data":"%s","timestamp":"%s"}`
-
-	//
-	ValidatorNotFoundErrorMessage   = "validator %s not found"
-	ValidationFailedErrorMessage    = "validation failed: %s"
-	HttpRequestCreationErrorMessage = "error creating http request: %s"
-	HttpRequestSendingErrorMessage  = "error sending http request: %s"
-)
-
 var (
 	// validatorsMap is a map of integration names and their respective validation functions
 	validatorsMap = map[string]func(data string) (result bool, hint string, err error){
@@ -33,7 +39,8 @@ var (
 	}
 )
 
-// Sync
+// Sync function is used to synchronize the RulerAction resource with the alerts. Executes the webhook defined in the
+// resource for each alert found in the AlertsPool.
 func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.RulerAction) (err error) {
 
 	logger := log.FromContext(ctx)
@@ -41,8 +48,7 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 	// Get credentials for the Action in the secret associated if defined
 	username := ""
 	password := ""
-	emptyCredentials := v1alpha1.RulerActionCredentials{}
-	if resource.Spec.Webhook.Credentials != emptyCredentials {
+	if !reflect.ValueOf(resource.Spec.Webhook.Credentials).IsZero() {
 		// First get secret with the credentials
 		RulerActionCredsSecret := &corev1.Secret{}
 		namespacedName := types.NamespacedName{
@@ -51,91 +57,115 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 		}
 		err = r.Get(ctx, namespacedName, RulerActionCredsSecret)
 		if err != nil {
-			return fmt.Errorf("error fetching secret %s: %v", namespacedName, err)
+			r.UpdateConditionNoCredsFound(resource)
+			return fmt.Errorf(SecretNotFoundErrorMessage, namespacedName, err)
 		}
 
 		// Get username and password
 		username = string(RulerActionCredsSecret.Data[resource.Spec.Webhook.Credentials.SecretRef.KeyUsername])
 		password = string(RulerActionCredsSecret.Data[resource.Spec.Webhook.Credentials.SecretRef.KeyPassword])
 		if username == "" || password == "" {
-			return fmt.Errorf("missing credentials in secret %s", namespacedName)
+			r.UpdateConditionNoCredsFound(resource)
+			return fmt.Errorf(MissingCredentialsMessage, namespacedName)
 		}
 	}
 
-	// Check alerts
+	// Check alert pool for alerts related to this rulerAction
+	// Alerts key pattern: namespace/rulerActionName/searchRuleName
 	alerts := r.AlertsPool.GetByRegex(fmt.Sprintf("%s/%s/*", resource.Namespace, resource.Name))
-	for _, alert := range alerts {
 
-		logger.Info(fmt.Sprintf("Alert: %s", alert.SearchRule.Spec.Description))
+	// If there are alerts for the rulerAction, initialice the HTTP client
+	if len(alerts) > 0 {
+		// Create the HTTP client
 		httpClient := &http.Client{}
 
-		// Create the request
+		// Create the request with the configured verb and URL
 		httpRequest, err := http.NewRequest(resource.Spec.Webhook.Verb, resource.Spec.Webhook.Url, nil)
 		if err != nil {
-			return fmt.Errorf("error %v", err)
+			return fmt.Errorf(HttpRequestCreationErrorMessage, err)
 		}
 
-		// Add headers to the request
+		// Add headers to the request if set
+		httpRequest.Header.Set("Content-Type", "application/json")
 		for headerKey, headerValue := range resource.Spec.Webhook.Headers {
 			httpRequest.Header.Set(headerKey, headerValue)
 		}
 
-		// Check if the webhook has a validator and execute it when available
-		if resource.Spec.Webhook.Validator != "" {
-
-			_, validatorFound := validatorsMap[resource.Spec.Webhook.Validator]
-			if !validatorFound {
-				return fmt.Errorf(ValidatorNotFoundErrorMessage, resource.Spec.Webhook.Validator)
-			}
-
-			//
-			validatorResult, validatorHint, err := validatorsMap[resource.Spec.Webhook.Validator](alert.SearchRule.Spec.ActionRef.Data)
-			if err != nil {
-				return fmt.Errorf(ValidationFailedErrorMessage, err.Error())
-			}
-
-			if !validatorResult {
-				return fmt.Errorf(ValidationFailedErrorMessage, validatorHint)
-			}
-		}
-
-		// Add data to the request
-		templateInjectedObject := map[string]interface{}{}
-		templateInjectedObject["value"] = alert.Value
-		templateInjectedObject["object"] = alert.SearchRule
-
-		parsedMessage, err := template.EvaluateTemplate(alert.SearchRule.Spec.ActionRef.Data, templateInjectedObject)
-		if err != nil {
-			return fmt.Errorf("error evaluating template message: %v", err)
-		}
-		payload := []byte(parsedMessage)
-
-		httpRequest.Body = io.NopCloser(bytes.NewBuffer(payload))
-		httpRequest.Header.Set("Content-Type", "application/json")
-
-		// Add authentication if set for elasticsearch queries
+		// Add authentication if set for the webhook
 		if username == "" || password == "" {
 			httpRequest.SetBasicAuth(username, password)
 		}
 
-		// Send HTTP request
-		httpResponse, err := httpClient.Do(httpRequest)
-		if err != nil {
-			return fmt.Errorf("error %v", err)
-		}
-		defer httpResponse.Body.Close()
+		// For every alert found in the pool, execute the
+		// webhook configured in the RulerAction resource
+		for _, alert := range alerts {
 
-		//
-		return err
+			// Log alert firing
+			logger.Info(fmt.Sprintf(
+				AlertFiringInfoMessage,
+				alert.SearchRule.Namespace,
+				alert.SearchRule.Spec.Description,
+			))
+
+			// Check if the webhook has a validator and execute it when available
+			if resource.Spec.Webhook.Validator != "" {
+
+				// Check if the validator is available
+				_, validatorFound := validatorsMap[resource.Spec.Webhook.Validator]
+				if !validatorFound {
+					return fmt.Errorf(ValidatorNotFoundErrorMessage, resource.Spec.Webhook.Validator)
+				}
+
+				// Execute the validator to the data of the alert
+				validatorResult, validatorHint, err := validatorsMap[resource.Spec.Webhook.Validator](alert.SearchRule.Spec.ActionRef.Data)
+				if err != nil {
+					return fmt.Errorf(ValidationFailedErrorMessage, err.Error())
+				}
+
+				// Check the result of the validator
+				if !validatorResult {
+					return fmt.Errorf(ValidationFailedErrorMessage, validatorHint)
+				}
+			}
+
+			// Add parsed data to the request
+			// object is the SearchRule object and value is the value of the alert
+			// to be accessible in the template
+			templateInjectedObject := map[string]interface{}{}
+			templateInjectedObject["value"] = alert.Value
+			templateInjectedObject["object"] = alert.SearchRule
+
+			// Evaluate the data template with the injected object
+			parsedMessage, err := template.EvaluateTemplate(alert.SearchRule.Spec.ActionRef.Data, templateInjectedObject)
+			if err != nil {
+				r.UpdateConditionEvaluateTemplateError(resource)
+				return fmt.Errorf(EvaluateTemplateErrorMessage, err)
+			}
+
+			// Add data to the payload of the request
+			payload := []byte(parsedMessage)
+			httpRequest.Body = io.NopCloser(bytes.NewBuffer(payload))
+
+			// Send HTTP request to the webhook
+			httpResponse, err := httpClient.Do(httpRequest)
+			if err != nil {
+				r.UpdateConditionConnectionError(resource)
+				return fmt.Errorf(HttpRequestSendingErrorMessage, err)
+			}
+
+			defer httpResponse.Body.Close()
+		}
 	}
 
+	// Updates status to Success
+	r.UpdateStateSuccess(resource)
 	return nil
 }
 
-// GetRuleActionFromEvent
+// GetRuleActionFromEvent returns the RulerAction resource associated with the event that triggered the reconcile
 func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, namespace, name string) (ruleAction v1alpha1.RulerAction, err error) {
 
-	// Get event resource
+	// Get event resource from the namespace and name of the event that triggered the reconcile
 	EventResource := &corev1.Event{}
 	namespacedName := types.NamespacedName{
 		Namespace: namespace,
@@ -143,10 +173,14 @@ func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, namespac
 	}
 	err = r.Get(ctx, namespacedName, EventResource)
 	if err != nil {
-		return ruleAction, fmt.Errorf("reconcile not triggered by event, triggered by %s : %v", namespacedName, err.Error())
+		return ruleAction, fmt.Errorf(
+			"reconcile not triggered by event, triggered by resource %s : %v",
+			namespacedName,
+			err.Error(),
+		)
 	}
 
-	// Get SearchRule resource
+	// Get SearchRule resource from event resource
 	searchRule := &v1alpha1.SearchRule{}
 	searchRuleNamespacedName := types.NamespacedName{
 		Namespace: EventResource.InvolvedObject.Namespace,
@@ -154,10 +188,15 @@ func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, namespac
 	}
 	err = r.Get(ctx, searchRuleNamespacedName, searchRule)
 	if err != nil {
-		return ruleAction, fmt.Errorf("error fetching SearchRule %s: %v", searchRuleNamespacedName, err)
+		return ruleAction, fmt.Errorf(
+			"error fetching SearchRule %s from event %s: %v",
+			searchRuleNamespacedName,
+			namespacedName,
+			err,
+		)
 	}
 
-	// Get RulerAction resource
+	// Get RulerAction resource from searchRule resource
 	ruleAction = v1alpha1.RulerAction{}
 	ruleActionNamespacedName := types.NamespacedName{
 		Namespace: searchRule.Namespace,
@@ -165,7 +204,12 @@ func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, namespac
 	}
 	err = r.Get(ctx, ruleActionNamespacedName, &ruleAction)
 	if err != nil {
-		return ruleAction, fmt.Errorf("error fetching RulerAction %s: %v", ruleActionNamespacedName, err)
+		return ruleAction, fmt.Errorf(
+			"error fetching RulerAction %s from searchRule %s: %v",
+			ruleActionNamespacedName,
+			searchRuleNamespacedName,
+			err,
+		)
 	}
 
 	return ruleAction, nil

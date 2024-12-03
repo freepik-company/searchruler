@@ -58,19 +58,22 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// 1. Get the content of the Patch
 
-	// 1.1 Try with event resource first
+	// 1.1 Try with RulerAction resource first. If it is not a RulerAction, then it will return an error
+	// but reconcile will try if it is an Event resource relationated with a RulerAction
 	RulerActionResource := &searchrulerv1alpha1.RulerAction{}
-	*RulerActionResource, err = r.GetEventRuleAction(ctx, req.Namespace, req.Name)
+	err = r.Get(ctx, req.NamespacedName, RulerActionResource)
 	if err != nil {
-		logger.Info(fmt.Sprintf("error getting RulerAction from event: %v", err.Error()))
-	} else {
+		// 1.2 Try with Event resource, if the event is not relationated with a RulerAction, then it will return an error
+		// but if true, the program goes to processEvent label, so events do not need to execute the rest of the code
+		*RulerActionResource, err = r.GetEventRuleAction(ctx, req.Namespace, req.Name)
+		if err != nil {
+			return result, fmt.Errorf(GetRulerActionErrorMessage, err.Error())
+		}
+		// Go to processEvent Label in step 7 (Sync function)
 		goto processEvent
 	}
 
-	// 1.2 If there are an error, try with RulerAction resource
-	err = r.Get(ctx, req.NamespacedName, RulerActionResource)
-
-	// 2. If it is not Event or RulerAction, then check existence on the cluster
+	// 2. Check existence on the cluster
 	if err != nil {
 
 		// 2.1 It does NOT exist: manage removal
@@ -134,10 +137,6 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 processEvent:
 	err = r.Sync(ctx, RulerActionResource)
 	if err != nil {
-		logger.Info(fmt.Sprintf("error: %v", err.Error()))
-		return result, err
-	}
-	if err != nil {
 		r.UpdateConditionKubernetesApiCallFailure(RulerActionResource)
 		logger.Info(fmt.Sprintf(syncTargetError, RulerActionResourceType, req.NamespacedName, err.Error()))
 		return result, err
@@ -155,6 +154,6 @@ func (r *RulerActionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&searchrulerv1alpha1.RulerAction{}).
 		Named("RulerAction").
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
-		Watches(&corev1.Event{}, &handler.EnqueueRequestForObject{}).
+		Watches(&corev1.Event{}, &handler.EnqueueRequestForObject{}). // Also watch for events, so SearchRule controller throws events when a rule is firing
 		Complete(r)
 }

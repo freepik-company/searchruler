@@ -45,6 +45,17 @@ import (
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
+
+	// Pools
+	QueryConnectorCredentialsPool = &pools.CredentialsStore{
+		Store: make(map[string]*pools.Credentials),
+	}
+	RulesPool = &pools.RulesStore{
+		Store: make(map[string]*pools.Rule),
+	}
+	AlertsPool = &pools.AlertsStore{
+		Store: make(map[string]*pools.Alert),
+	}
 )
 
 func init() {
@@ -152,17 +163,6 @@ func main() {
 	if err != nil {
 		setupLog.Error(err, "unable to set up kubernetes clients")
 		os.Exit(1)
-	}
-
-	// Define pools for controllers
-	var QueryConnectorCredentialsPool = &pools.CredentialsStore{
-		Store: make(map[string]*pools.Credentials),
-	}
-	var RulesPool = &pools.RulesStore{
-		Store: make(map[string]*pools.Rule),
-	}
-	var AlertsPool = &pools.AlertsStore{
-		Store: make(map[string]*pools.Alert),
 	}
 
 	if err = (&controller.RulerActionReconciler{

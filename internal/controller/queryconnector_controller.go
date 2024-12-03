@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -84,7 +85,8 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			}
 		}
 		// Delete credentials from pool
-		r.CredentialsPool.Delete(fmt.Sprintf("%s/%s", QueryConnectorResource.Namespace, QueryConnectorResource.Name))
+		credentialsKey := fmt.Sprintf("%s/%s", QueryConnectorResource.Namespace, QueryConnectorResource.Name)
+		r.CredentialsPool.Delete(credentialsKey)
 
 		result = ctrl.Result{}
 		err = nil
@@ -122,9 +124,8 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	// 7. Sync credentials if defined
-	emptyCredentials := searchrulerv1alpha1.QueryConnectorCredentials{}
-	if QueryConnectorResource.Spec.Credentials != emptyCredentials {
-		err = r.SyncCredentials(ctx, QueryConnectorResource)
+	if !reflect.ValueOf(QueryConnectorResource.Spec.Credentials).IsZero() {
+		err = r.Sync(ctx, QueryConnectorResource)
 		if err != nil {
 			r.UpdateConditionKubernetesApiCallFailure(QueryConnectorResource)
 			logger.Info(fmt.Sprintf(syncTargetError, QueryConnectorResourceType, req.NamespacedName, err.Error()))

@@ -121,7 +121,7 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// 7. Check the rule
-	err = r.CheckRule(ctx, searchRuleResource)
+	err = r.Sync(ctx, searchRuleResource)
 	if err != nil {
 		r.UpdateConditionKubernetesApiCallFailure(searchRuleResource)
 		logger.Info(fmt.Sprintf(syncTargetError, SearchRuleResourceType, req.NamespacedName, err.Error()))

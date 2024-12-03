@@ -1,3 +1,19 @@
+/*
+Copyright 2024.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package globals
 
 import (
@@ -6,24 +22,43 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// https://github.com/external-secrets/external-secrets/blob/80545f4f183795ef193747fc959558c761b51c99/apis/externalsecrets/v1alpha1/externalsecret_types.go#L168
 const (
-	// ConditionTypeResourceSynced indicates that the target was synced or not
+
+	// Constants for the sync conditions
+	// Condition type for sync resource
 	ConditionTypeResourceSynced = "ResourceSynced"
+
+	// Success
+	ConditionReasonTargetSynced        = "TargetSynced"
+	ConditionReasonTargetSyncedMessage = "Target was successfully synced"
 
 	// Kubernetes error type
 	ConditionReasonKubernetesApiCallErrorType    = "KubernetesApiCallError"
 	ConditionReasonKubernetesApiCallErrorMessage = "Call to Kubernetes API failed. More info in logs."
 
+	// Constants for the state conditions
+	// Condition type for state
+	ConditionTypeState = "State"
+
+	// State success type
+	ConditionReasonStateSuccessType    = "Success"
+	ConditionReasonStateSuccessMessage = "Success executing tasks"
+
 	// Alert firing and resolved status messages
-	ConditionTypeAlertFiring     = "AlertFiring"
 	ConditionReasonAlertFiring   = "AlertFiring"
-	ConditionTypeAlertResolved   = "AlertResolved"
 	ConditionReasonAlertResolved = "AlertResolved"
 
-	// Success
-	ConditionReasonTargetSynced        = "TargetSynced"
-	ConditionReasonTargetSyncedMessage = "Target was successfully synced"
+	// No credentials found
+	ConditionReasonNoCredsFoundType    = "NoCredsFound"
+	ConditionReasonNoCredsFoundMessage = "No credentials found in secret"
+
+	// Connection error
+	ConditionReasonConnectionErrorType    = "ConnectionError"
+	ConditionReasonConnectionErrorMessage = "Connection error to the webhook target to send the alert"
+
+	// Evaluate template error
+	ConditionReasonEvaluateTemplateErrorType    = "EvaluateTemplateError"
+	ConditionReasonEvaluateTemplateErrorMessage = "Error evaluating the template for the alert"
 )
 
 var (
@@ -66,19 +101,5 @@ func UpdateCondition(conditions *[]metav1.Condition, condition metav1.Condition)
 		currentCondition.Reason = condition.Reason
 		currentCondition.Message = condition.Message
 		currentCondition.LastTransitionTime = metav1.Now()
-	}
-}
-
-func DeleteCondition(conditions *[]metav1.Condition, condType string) {
-	index := -1
-	for i, cond := range *conditions {
-		if cond.Type == condType {
-			index = i
-			break
-		}
-	}
-
-	if index != -1 {
-		*conditions = append((*conditions)[:index], (*conditions)[index+1:]...)
 	}
 }
