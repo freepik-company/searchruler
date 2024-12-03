@@ -21,15 +21,12 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
 	"prosimcorp.com/SearchRuler/internal/pools"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -61,33 +58,17 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// 1. Get the content of the Patch
 
-	// 1.1 Try with RulerAction resource
+	// 1.1 Try with event resource first
 	RulerActionResource := &searchrulerv1alpha1.RulerAction{}
-	err = r.Get(ctx, req.NamespacedName, RulerActionResource)
-
-	// 1.2 If there are an error, try with Event type resource
-	if errors.IsNotFound(err) {
-		EventResource := &corev1.Event{}
-		err = r.Get(ctx, req.NamespacedName, EventResource)
-
-		// If the resource is an event, then get the SearchRule resource associated to the event
-		// and then the RulerAction resource associated to the SearchRule
-		if err == nil {
-			SearchRuleResource := &searchrulerv1alpha1.SearchRule{}
-			SearchRuleNamespacedName := types.NamespacedName{
-				Namespace: EventResource.InvolvedObject.Namespace,
-				Name:      EventResource.InvolvedObject.Name,
-			}
-			err = r.Get(ctx, SearchRuleNamespacedName, SearchRuleResource)
-			if err == nil {
-				RulerActionNamespacedName := types.NamespacedName{
-					Namespace: SearchRuleResource.Namespace,
-					Name:      SearchRuleResource.Spec.ActionRef.Name,
-				}
-				err = r.Get(ctx, RulerActionNamespacedName, RulerActionResource)
-			}
-		}
+	*RulerActionResource, err = r.GetEventRuleAction(ctx, req.Namespace, req.Name)
+	if err != nil {
+		logger.Info(fmt.Sprintf("error getting RulerAction from event: %v", err.Error()))
+	} else {
+		goto processEvent
 	}
+
+	// 1.2 If there are an error, try with RulerAction resource
+	err = r.Get(ctx, req.NamespacedName, RulerActionResource)
 
 	// 2. If it is not Event or RulerAction, then check existence on the cluster
 	if err != nil {
@@ -150,6 +131,7 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// }
 
 	// 7. Sync credentials if defined
+processEvent:
 	err = r.Sync(ctx, RulerActionResource)
 	if err != nil {
 		logger.Info(fmt.Sprintf("error: %v", err.Error()))
@@ -172,17 +154,7 @@ func (r *RulerActionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&searchrulerv1alpha1.RulerAction{}).
 		Named("RulerAction").
-		WithEventFilter(predicate.Funcs{
-			CreateFunc: func(e event.CreateEvent) bool {
-				return true
-			},
-			DeleteFunc: func(e event.DeleteEvent) bool {
-				return true
-			},
-			UpdateFunc: func(e event.UpdateEvent) bool {
-				return false
-			},
-		}).
+		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		Watches(&corev1.Event{}, &handler.EnqueueRequestForObject{}).
 		Complete(r)
 }

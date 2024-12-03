@@ -46,7 +46,7 @@ spec:
                     description: RulerActionCredentials TODO
                     properties:
                       secretRef:
-                        description: SecretReference TODO
+                        description: SecretRef TODO
                         properties:
                           keyPassword:
                             type: string

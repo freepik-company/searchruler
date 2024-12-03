@@ -7,7 +7,7 @@ import (
 	"io"
 	"net/http"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"prosimcorp.com/SearchRuler/api/v1alpha1"
 	"prosimcorp.com/SearchRuler/internal/template"
@@ -44,7 +44,7 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 	emptyCredentials := v1alpha1.RulerActionCredentials{}
 	if resource.Spec.Webhook.Credentials != emptyCredentials {
 		// First get secret with the credentials
-		RulerActionCredsSecret := &v1.Secret{}
+		RulerActionCredsSecret := &corev1.Secret{}
 		namespacedName := types.NamespacedName{
 			Namespace: resource.Namespace,
 			Name:      resource.Spec.Webhook.Credentials.SecretRef.Name,
@@ -130,4 +130,43 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 	}
 
 	return nil
+}
+
+// GetRuleActionFromEvent
+func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, namespace, name string) (ruleAction v1alpha1.RulerAction, err error) {
+
+	// Get event resource
+	EventResource := &corev1.Event{}
+	namespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	}
+	err = r.Get(ctx, namespacedName, EventResource)
+	if err != nil {
+		return ruleAction, fmt.Errorf("reconcile not triggered by event, triggered by %s : %v", namespacedName, err.Error())
+	}
+
+	// Get SearchRule resource
+	searchRule := &v1alpha1.SearchRule{}
+	searchRuleNamespacedName := types.NamespacedName{
+		Namespace: EventResource.InvolvedObject.Namespace,
+		Name:      EventResource.InvolvedObject.Name,
+	}
+	err = r.Get(ctx, searchRuleNamespacedName, searchRule)
+	if err != nil {
+		return ruleAction, fmt.Errorf("error fetching SearchRule %s: %v", searchRuleNamespacedName, err)
+	}
+
+	// Get RulerAction resource
+	ruleAction = v1alpha1.RulerAction{}
+	ruleActionNamespacedName := types.NamespacedName{
+		Namespace: searchRule.Namespace,
+		Name:      searchRule.Spec.ActionRef.Name,
+	}
+	err = r.Get(ctx, ruleActionNamespacedName, &ruleAction)
+	if err != nil {
+		return ruleAction, fmt.Errorf("error fetching RulerAction %s: %v", ruleActionNamespacedName, err)
+	}
+
+	return ruleAction, nil
 }

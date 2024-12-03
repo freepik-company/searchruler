@@ -30,8 +30,8 @@ type Elasticsearch struct {
 
 	ConditionField string `json:"conditionField"`
 
-	QueryRaw string                `json:"queryRaw,omitempty"`
-	Query    *apiextensionsv1.JSON `json:"query,omitempty"`
+	QueryJSON string                `json:"queryJSON,omitempty"`
+	Query     *apiextensionsv1.JSON `json:"query,omitempty"`
 }
 
 // Condition TODO
@@ -54,27 +54,16 @@ type QueryConnectorRef struct {
 
 // SearchRuleSpec defines the desired state of SearchRule.
 type SearchRuleSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	Description string `json:"description,omitempty"`
-
+	Description       string            `json:"description,omitempty"`
 	QueryConnectorRef QueryConnectorRef `json:"queryConnectorRef"`
-
-	CheckInterval string `json:"checkInterval"`
-
-	Elasticsearch Elasticsearch `json:"elasticsearch"`
-
-	Condition Condition `json:"condition"`
-
-	ActionRef ActionRef `json:"actionRef"`
+	CheckInterval     string            `json:"checkInterval"`
+	Elasticsearch     Elasticsearch     `json:"elasticsearch"`
+	Condition         Condition         `json:"condition"`
+	ActionRef         ActionRef         `json:"actionRef"`
 }
 
 // SearchRuleStatus defines the observed state of SearchRule.
 type SearchRuleStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	Conditions []metav1.Condition `json:"conditions"`
 }
 

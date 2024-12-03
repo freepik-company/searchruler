@@ -6,13 +6,27 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: ruleraction-sample
 spec:
+
+  # Webhook integration configuration to send alerts.
+  # Note: The webhook integration is the only one implemented yet.
   webhook:
-    url: https://webhook.site/3f2e28af-68b2-47bd-b603-f8abcdf2ac93
+
+    # URL to send the webhook message
+    url: http://127.0.0.1:8080
+
+    # HTTP method to send the webhook message
     verb: POST
+
+    # Additional headers if needed for the connection
     headers: {}
 
-    #validator: alertmanager
+    # Validator configuration to validate the response of the webhook
+    # Just alertmanager validation available yet.
+    # If you use alertmanager validator, message data must be in alertmanager format:
+    # https://prometheus.io/docs/alerting/latest/clients/
+    # validator: alertmanager
 
+    # Credentials to authenticate in the webhook if needed
     # credentials:   
     #   secretRef:
     #     name: alertmanager-credentials

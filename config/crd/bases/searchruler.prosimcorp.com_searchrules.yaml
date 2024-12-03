@@ -76,7 +76,7 @@ spec:
                     type: string
                   query:
                     x-kubernetes-preserve-unknown-fields: true
-                  queryRaw:
+                  queryJSON:
                     type: string
                 required:
                 - conditionField

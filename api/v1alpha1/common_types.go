@@ -1,6 +1,6 @@
 package v1alpha1
 
-// SecretReference TODO
+// SecretRef TODO
 type SecretRef struct {
 	Name        string `json:"name"`
 	KeyUsername string `json:"keyUsername"`

@@ -123,15 +123,26 @@ func (r *SearchRuleReconciler) CheckRule(ctx context.Context, resource *v1alpha1
 		}
 	}
 
-	// Check if query is defined
-	if resource.Spec.Elasticsearch.Query == nil {
+	// Check if query is defined in the resource
+	if resource.Spec.Elasticsearch.Query == nil && resource.Spec.Elasticsearch.QueryJSON == "" {
 		return fmt.Errorf("query not defined")
 	}
 
-	// Get elasticsearch query to execute from resource
-	elasticQuery, err := json.Marshal(resource.Spec.Elasticsearch.Query)
-	if err != nil {
-		return fmt.Errorf("error marshalling query body: %v", err)
+	// Check if both query and queryJson are defined. If true, return error
+	if resource.Spec.Elasticsearch.Query != nil && resource.Spec.Elasticsearch.QueryJSON != "" {
+		return fmt.Errorf("both query and queryJSON are defined. Only one of them must be defined")
+	}
+
+	// Select query to use and marshall to JSON
+	var elasticQuery []byte
+	if resource.Spec.Elasticsearch.Query != nil {
+		elasticQuery, err = json.Marshal(resource.Spec.Elasticsearch.Query)
+		if err != nil {
+			return fmt.Errorf("error marshalling query body: %v", err)
+		}
+	}
+	if resource.Spec.Elasticsearch.QueryJSON != "" {
+		elasticQuery = []byte(resource.Spec.Elasticsearch.QueryJSON)
 	}
 
 	// Make http client for elasticsearch connection

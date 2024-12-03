@@ -6,7 +6,7 @@ const (
 	QueryConnectorResourceType = "QueryConnector"
 
 	// Sync interval to check if secrets of SearchRuleAction and SearchRuleQueryConnector are up to date
-	defaultSyncInterval = "5s"
+	defaultSyncInterval = "1m"
 
 	// Error messages
 	resourceNotFoundError          = "%s '%s' resource not found. Ignoring since object must be deleted."

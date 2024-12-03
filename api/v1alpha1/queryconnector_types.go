@@ -20,10 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
-// Credentials TODO
+// QueryConnectorCredentials TODO
 type QueryConnectorCredentials struct {
 	SyncInterval string    `json:"syncInterval,omitempty"`
 	SecretRef    SecretRef `json:"secretRef"`
@@ -31,9 +28,6 @@ type QueryConnectorCredentials struct {
 
 // QueryConnectorSpec defines the desired state of QueryConnector.
 type QueryConnectorSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	URL           string                    `json:"url"`
 	Headers       map[string]string         `json:"headers,omitempty"`
 	TlsSkipVerify bool                      `json:"tlsSkipVerify,omitempty"`
@@ -42,9 +36,6 @@ type QueryConnectorSpec struct {
 
 // QueryConnectorStatus defines the observed state of QueryConnector.
 type QueryConnectorStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	Conditions []metav1.Condition `json:"conditions"`
 }
 

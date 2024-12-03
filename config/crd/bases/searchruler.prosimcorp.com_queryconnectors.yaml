@@ -40,10 +40,10 @@ spec:
             description: QueryConnectorSpec defines the desired state of QueryConnector.
             properties:
               credentials:
-                description: Credentials TODO
+                description: QueryConnectorCredentials TODO
                 properties:
                   secretRef:
-                    description: SecretReference TODO
+                    description: SecretRef TODO
                     properties:
                       keyPassword:
                         type: string

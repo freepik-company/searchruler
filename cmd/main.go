@@ -154,7 +154,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Define pools
+	// Define pools for controllers
 	var QueryConnectorCredentialsPool = &pools.CredentialsStore{
 		Store: make(map[string]*pools.Credentials),
 	}

@@ -6,23 +6,69 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: searchrule-sample
 spec:
+
+  # Description for the Rule. It is not used in the rule execution, but is useful for the
+  # message template in the RuleAction.
   description: "Alert when there are a high error rate in the application."
 
-  # QueryConnector to execute queries
+  # QueryConnector reference to execute the queries for the rule evaluation.
   queryConnectorRef:
     name: queryconnector-sample
 
-  # Interval time for checking the value of the query
+  # Interval time for checking the value of the query. For example, every 30s we will
+  # execute the query value to elasticsearch
   checkInterval: 30s
 
-  # Query to execute in the QueryConnector
+  # Elasticsearch configuration for the query execution.
+  # Just elasticsearch is implemented yet.
   elasticsearch:
+
+    # Index, index pattern or alias where the query will be executed
+    # It will be appended to <URL>/<index>/_search endpoint
     index: "kibana_sample_data_logs"
 
-    # # Response field to watch for the condition check
-    # conditionField: "aggregations.average_response_time.value"
+    # Elasticsearch query to execute.
+    # Normally it is a JSON query, but we are using YAML format for the manifest ;D
+    # so please, transform your JSON query to YAML in the manifest.
+    # This option will execute the query: {"_source": [""], "query": { "bool": { "must": [ { "range": { "response": { "gte": 499 } } } ] } } }
+    query:
+      _source: [""]
+      query: 
+        bool:
+          must:
+            - range:
+                response:
+                  gte: 499
 
-    # # Query to execute in elasticsearch in yaml format (operator transform it to json)
+    # Okay, if you don't like YAML format, you can use the queryJSON field to put the JSON query
+    # directly in the manifest. It will be parsed to the query field. But, if you use both fields,
+    # the operator will fail.
+    # queryJSON: >
+    #   {
+    #     "_source": [""],
+    #     "query": {
+    #       "bool": {
+    #         "must": [
+    #           {
+    #             "range": {
+    #               "response": {
+    #                 "gte": 499
+    #               }
+    #             }
+    #           }
+    #         ]
+    #       }
+    #     }
+    #   }
+
+    # Response JSON field to watch for the condition check. Each query to elasticsearch
+    # returns a JSON response like:
+    # { "hits": "total": { "value": 100 }, hits: [ ... ] }
+    # hits.total.value checks the total hits of the query
+    conditionField: "hits.total.value"
+
+    
+    # Another example for queries with aggregations
     # query:
     #   _source: [""]
     #   query:
@@ -39,54 +85,27 @@ spec:
     #       average_response_time:
     #         avg:
     #           field: "upstream_response_time_f"
+    # conditionField: "aggregations.average_response_time.value"
 
-    query:
-      _source: [""]
-      query: 
-        bool:
-          must:
-            - range:
-                response:
-                  gte: 499
-
-    # Response field to watch for the condition check
-    conditionField: "hits.total.value"
-
-    # Raw query to execute in elasticsearch in json format
-    # queryRaw: >
-    #     "_source": [""],
-    #     "query": {
-    #       "bool": {
-    #         "must": [
-    #           {
-    #             "range": {
-    #               "response_code": {
-    #                 "gte": 499
-    #               }
-    #             }
-    #           },
-    #             {
-    #               "range": {
-    #                 "timestamp": {
-    #                   "gte": "now-5m/m",
-    #                   "lte": "now/m"
-    #                 }
-    #               }
-    #             }
-    #         ]
-    #       }
-    #     }
-
-  # Condition to execute the SearchRuleAction
+  # Condition for the rule evaluation. It will check the conditionField value with the
+  # operator and threshold. If the condition is true, the RuleAction will be executed.
   condition:
-    # greaterThan, greaterThanOrEqual, lessThan, lessThanOrEqual or equal
+    # Available options: greaterThan, greaterThanOrEqual, lessThan, lessThanOrEqual or equal
     operator: "greaterThan"
+    # Threshold value to check the condition
     threshold: "100"
+    # Time window to check the condition. For example, if the condition is greaterThan 100 for 1m
     for: "1m"
 
-  # SearchAction item
+  # RuleAction reference to execute when the condition is true.
   actionRef:
     name: ruleraction-sample
+    # Message template to send in the RuleAction execution. It is a Go template with the
+    # object and value variables. The object variable is the SearchRule object and the
+    # value variable is the value of the conditionField.
+
+    # If the ruleaction is a alertmanager webhook, the message must be in alertmanager format:
+    # https://prometheus.io/docs/alerting/latest/clients/
     data: |
       {{- $object := .object -}}
       {{- $value := .value -}}
