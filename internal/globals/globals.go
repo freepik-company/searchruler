@@ -24,6 +24,10 @@ const (
 	// Success
 	ConditionReasonTargetSynced        = "TargetSynced"
 	ConditionReasonTargetSyncedMessage = "Target was successfully synced"
+
+	// No credentials found
+	ConditionReasonNoCredsFoundMessage = "No credentials found"
+	ConditionReasonNoCredsFoundType    = "NoCredsFound"
 )
 
 var (

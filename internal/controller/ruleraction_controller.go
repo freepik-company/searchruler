@@ -134,10 +134,6 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 processEvent:
 	err = r.Sync(ctx, RulerActionResource)
 	if err != nil {
-		logger.Info(fmt.Sprintf("error: %v", err.Error()))
-		return result, err
-	}
-	if err != nil {
 		r.UpdateConditionKubernetesApiCallFailure(RulerActionResource)
 		logger.Info(fmt.Sprintf(syncTargetError, RulerActionResourceType, req.NamespacedName, err.Error()))
 		return result, err
@@ -155,6 +151,6 @@ func (r *RulerActionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&searchrulerv1alpha1.RulerAction{}).
 		Named("RulerAction").
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
-		Watches(&corev1.Event{}, &handler.EnqueueRequestForObject{}).
+		Watches(&corev1.Event{}, &handler.EnqueueRequestForObject{}). // Also watch for events, so SearchRule controller throws events when a rule is firing
 		Complete(r)
 }

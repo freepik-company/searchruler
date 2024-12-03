@@ -98,8 +98,8 @@ func createKubeEvent(ctx context.Context, rule v1alpha1.SearchRule, action, mess
 	return err
 }
 
-// CheckRule execute the query to the elasticsearch and evaluate the condition. Then trigger the action
-func (r *SearchRuleReconciler) CheckRule(ctx context.Context, resource *v1alpha1.SearchRule) (err error) {
+// Sync execute the query to the elasticsearch and evaluate the condition. Then trigger the action
+func (r *SearchRuleReconciler) Sync(ctx context.Context, resource *v1alpha1.SearchRule) (err error) {
 
 	logger := log.FromContext(ctx)
 
