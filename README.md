@@ -288,7 +288,7 @@ Here’s an example to show how to configure an Alertmanager-compatible message:
         {{- $description := printf `
 
         Description: %s
-        Value: %s
+        Value: %v
 
         -------------------------------
         Name: %s

@@ -58,20 +58,16 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// 1. Get the content of the Patch
 
-	// 1.1 Try with RulerAction resource first. If it is not a RulerAction, then it will return an error
-	// but reconcile will try if it is an Event resource relationated with a RulerAction
+	// 1.1 Try with Event resource first. If it is not an Event, then it will return an error
+	// but reconcile will try if it is a RulerAction resource relationated with an Event
 	RulerActionResource := &searchrulerv1alpha1.RulerAction{}
-	err = r.Get(ctx, req.NamespacedName, RulerActionResource)
-	if err != nil {
-		// 1.2 Try with Event resource, if the event is not relationated with a RulerAction, then it will return an error
-		// but if true, the program goes to processEvent label, so events do not need to execute the rest of the code
-		*RulerActionResource, err = r.GetEventRuleAction(ctx, req.Namespace, req.Name)
-		if err != nil {
-			return result, fmt.Errorf(GetRulerActionErrorMessage, err.Error())
-		}
-		// Go to processEvent Label in step 7 (Sync function)
+	*RulerActionResource, err = r.GetEventRuleAction(ctx, req.Namespace, req.Name)
+	if err == nil {
 		goto processEvent
 	}
+
+	// 1.2 Try with RulerAction resource
+	err = r.Get(ctx, req.NamespacedName, RulerActionResource)
 
 	// 2. Check existence on the cluster
 	if err != nil {
