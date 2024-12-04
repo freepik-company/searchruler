@@ -1,0 +1,27 @@
+# permissions for end users to edit queryconnectors.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: search-ruler
+    app.kubernetes.io/managed-by: kustomize
+  name: queryconnector-editor-role
+rules:
+- apiGroups:
+  - searchruler.prosimcorp.com
+  resources:
+  - queryconnectors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - searchruler.prosimcorp.com
+  resources:
+  - queryconnectors/status
+  verbs:
+  - get

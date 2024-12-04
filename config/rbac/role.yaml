@@ -1,0 +1,38 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - searchruler.prosimcorp.com
+  resources:
+  - QueryConnectors
+  - RulerActions
+  - searchrules
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - searchruler.prosimcorp.com
+  resources:
+  - QueryConnectors/finalizers
+  - RulerActions/finalizers
+  - searchrules/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - searchruler.prosimcorp.com
+  resources:
+  - QueryConnectors/status
+  - RulerActions/status
+  - searchrules/status
+  verbs:
+  - get
+  - patch
+  - update

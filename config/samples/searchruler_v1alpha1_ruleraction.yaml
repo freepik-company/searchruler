@@ -1,0 +1,37 @@
+apiVersion: searchruler.prosimcorp.com/v1alpha1
+kind: RulerAction
+metadata:
+  labels:
+    app.kubernetes.io/name: search-ruler
+    app.kubernetes.io/managed-by: kustomize
+  name: ruleraction-sample
+spec:
+
+  # Webhook integration configuration to send alerts.
+  # Note: The webhook integration is the only one implemented yet.
+  webhook:
+
+    # URL to send the webhook message
+    url: http://127.0.0.1:8080
+
+    # HTTP method to send the webhook message
+    verb: POST
+
+    # Skip certificate verification if the connection is HTTPS
+    tlsSkipVerify: false
+
+    # Additional headers if needed for the connection
+    headers: {}
+
+    # Validator configuration to validate the response of the webhook
+    # Just alertmanager validation available yet.
+    # If you use alertmanager validator, message data must be in alertmanager format:
+    # https://prometheus.io/docs/alerting/latest/clients/
+    # validator: alertmanager
+
+    # Credentials to authenticate in the webhook if needed
+    # credentials:   
+    #   secretRef:
+    #     name: alertmanager-credentials
+    #     keyUsername: username
+    #     keyPassword: password
