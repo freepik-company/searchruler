@@ -4,20 +4,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.4
-  name: RulerActions.searchruler.prosimcorp.com
+  name: queryconnectors.searchruler.prosimcorp.com
 spec:
   group: searchruler.prosimcorp.com
   names:
-    kind: RulerAction
-    listKind: RulerActionList
-    plural: RulerActions
-    singular: RulerAction
+    kind: QueryConnector
+    listKind: QueryConnectorList
+    plural: queryconnectors
+    singular: queryconnector
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: RulerAction is the Schema for the RulerActions API.
+        description: QueryConnector is the Schema for the QueryConnectors API.
         properties:
           apiVersion:
             description: |-
@@ -37,52 +37,43 @@ spec:
           metadata:
             type: object
           spec:
-            description: RulerActionSpec defines the desired state of RulerAction.
+            description: QueryConnectorSpec defines the desired state of QueryConnector.
             properties:
-              webhook:
-                description: WebHook TODO
+              credentials:
+                description: QueryConnectorCredentials TODO
                 properties:
-                  credentials:
-                    description: Credentials TODO
+                  secretRef:
+                    description: SecretRef TODO
                     properties:
-                      secretRef:
-                        description: SecretReference TODO
-                        properties:
-                          keyPassword:
-                            type: string
-                          keyUsername:
-                            type: string
-                          name:
-                            type: string
-                        required:
-                        - keyPassword
-                        - keyUsername
-                        - name
-                        type: object
-                      syncInterval:
+                      keyPassword:
+                        type: string
+                      keyUsername:
+                        type: string
+                      name:
                         type: string
                     required:
-                    - secretRef
+                    - keyPassword
+                    - keyUsername
+                    - name
                     type: object
-                  headers:
-                    additionalProperties:
-                      type: string
-                    type: object
-                  url:
-                    type: string
-                  validator:
-                    type: string
-                  verb:
+                  syncInterval:
                     type: string
                 required:
-                - url
-                - verb
+                - secretRef
                 type: object
+              headers:
+                additionalProperties:
+                  type: string
+                type: object
+              tlsSkipVerify:
+                type: boolean
+              url:
+                type: string
             required:
-            - webhook
+            - url
             type: object
           status:
-            description: RulerActionStatus defines the observed state of RulerAction.
+            description: QueryConnectorStatus defines the observed state of QueryConnector.
             properties:
               conditions:
                 items:

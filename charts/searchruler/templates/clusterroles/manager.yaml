@@ -1,0 +1,51 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "searchruler.fullname" . }}-manager
+  labels:
+    {{- include "searchruler.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - '*'
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - validatingwebhookconfigurations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - searchruler.freepik.com
+  resources:
+  - clusteradmissionpolicies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - searchruler.freepik.com
+  resources:
+  - clusteradmissionpolicies/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - searchruler.freepik.com
+  resources:
+  - clusteradmissionpolicies/status
+  verbs:
+  - get
+  - patch
+  - update
