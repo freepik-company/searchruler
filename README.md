@@ -3,8 +3,14 @@
 
 <img src="https://raw.githubusercontent.com/prosimcorp/searchruler/master/docs/img/logo.png" alt="SearchRuler Logo (Main) logo." width="150">
 
-![GitHub go.mod Go version (subdirectory of monorepo)](https://img.shields.io/github/go-mod/go-version/prosimcorp/searchruler)
-![GitHub](https://img.shields.io/github/license/prosimcorp/searchruler)
+![GitHub Release](https://img.shields.io/github/v/release/prosimcorp/searchruler)
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/prosimcorp/searchruler)
+[![Go Report Card](https://goreportcard.com/badge/github.com/prosimcorp/searchruler)](https://goreportcard.com/report/github.com/prosimcorp/searchruler)
+![image pulls](https://img.shields.io/badge/+2k-brightgreen?label=image%20pulls)
+![GitHub License](https://img.shields.io/github/license/prosimcorp/searchruler)
+
+![GitHub User's stars](https://img.shields.io/github/stars/prosimcorp?label=Prosimcorp%20Stars)
+![GitHub followers](https://img.shields.io/github/followers/prosimcorp?label=Prosimcorp%20Followers)
 
 Ever wished Prometheus Ruler had a cool cousin for log searches? Say hello to searchruler! This Kubernetes operator lets you define, run, and manage log search rules (alerts) for platforms like Elasticsearch or Opensearch—all from the comfort of your K8s cluster. 🚀
 

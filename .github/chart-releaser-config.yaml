@@ -1,1 +1,0 @@
-release-name-template: "{{ .Name }}-helm-chart-{{ .Version }}"
