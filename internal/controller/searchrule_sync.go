@@ -248,14 +248,6 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 			rule.State = ruleFiringState
 			r.RulesPool.Set(ruleKey, rule)
 
-			// Log the alert and change the AlertStatus to Firing of the searchRule
-			r.UpdateConditionAlertFiring(resource)
-			logger.Info(fmt.Sprintf(
-				"Rule %s is in firing state. Current value is %v",
-				resource.Name,
-				conditionValue,
-			))
-
 			// Add alert to the pool with the value, the object and the rulerAction name which will trigger the alert
 			alertKey := fmt.Sprintf("%s/%s", resource.Namespace, resource.Name)
 			r.AlertsPool.Set(alertKey, &pools.Alert{
@@ -276,9 +268,20 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 				return fmt.Errorf(KubeEventCreationErrorMessage, err)
 			}
 
+			// Log the alert and change the AlertStatus to Firing of the searchRule
+			r.UpdateConditionAlertFiring(resource)
+			logger.Info(fmt.Sprintf(
+				"Rule %s is in firing state. Current value is %v",
+				resource.Name,
+				conditionValue,
+			))
+			return nil
+
 		}
 
+		r.UpdateStateAlertPendingFiring(resource)
 		return nil
+
 	}
 
 	// If alert is not firing right now and it is not in healthy state
@@ -294,14 +297,6 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 		// If rule stay in PendingResolved state during the `for` time, mark as resolved
 		if time.Since(rule.ResolvingTime) > forDuration {
 
-			// Log and update the AlertStatus to Resolved
-			r.UpdateConditionAlertResolved(resource)
-			logger.Info(fmt.Sprintf(
-				"Rule %s is in resolved state. Current value is %v",
-				resource.Name,
-				conditionValue,
-			))
-
 			// Remove alert from the pool
 			alertKey := fmt.Sprintf("%s/%s", resource.Namespace, resource.Name)
 			r.AlertsPool.Delete(alertKey)
@@ -313,9 +308,22 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 				ResolvingTime: time.Time{},
 			}
 			r.RulesPool.Set(ruleKey, rule)
+
+			// Log and update the AlertStatus to Resolved
+			r.UpdateConditionAlertResolved(resource)
+			logger.Info(fmt.Sprintf(
+				"Rule %s is in resolved state. Current value is %v",
+				resource.Name,
+				conditionValue,
+			))
+			return nil
 		}
+
+		r.UpdateStateAlertPendingResolved(resource)
+		return nil
 	}
 
+	r.UpdateStateHealthy(resource)
 	return nil
 }
 

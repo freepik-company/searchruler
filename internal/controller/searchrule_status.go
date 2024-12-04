@@ -45,7 +45,17 @@ func (r *SearchRuleReconciler) UpdateConditionKubernetesApiCallFailure(SearchRul
 	globals.UpdateCondition(&SearchRule.Status.Conditions, condition)
 }
 
-// Note: No state status means no alert fired never for this rule
+// UpdateStateHealthy updates the status of the SearchRule resource with a Healthy condition
+func (r *SearchRuleReconciler) UpdateStateHealthy(SearchRule *v1alpha1.SearchRule) {
+
+	// Create the new condition with the Healthy status
+	condition := globals.NewCondition(globals.ConditionTypeState, metav1.ConditionTrue,
+		globals.ConditionReasonStateHealthyType, globals.ConditionReasonStateHealthyMessage)
+
+	// Update the status of the SearchRule resource
+	globals.UpdateCondition(&SearchRule.Status.Conditions, condition)
+}
+
 // UpdateConditionNoCredsFound updates the status of the SearchRule resource with alert firing condition
 func (r *SearchRuleReconciler) UpdateConditionAlertFiring(searchRule *v1alpha1.SearchRule) {
 
@@ -63,6 +73,28 @@ func (r *SearchRuleReconciler) UpdateConditionAlertResolved(searchRule *v1alpha1
 	// Create the new condition with the alert resolved status
 	condition := globals.NewCondition(globals.ConditionTypeState, metav1.ConditionTrue,
 		globals.ConditionReasonAlertResolved, globals.ConditionReasonAlertResolvedMessage)
+
+	// Update the status of the SearchRule resource
+	globals.UpdateCondition(&searchRule.Status.Conditions, condition)
+}
+
+// UpdateStateAlertPendingFiring updates the status of the SearchRule resource with alert pending firing condition
+func (r *SearchRuleReconciler) UpdateStateAlertPendingFiring(searchRule *v1alpha1.SearchRule) {
+
+	// Create the new condition with the alert resolved status
+	condition := globals.NewCondition(globals.ConditionTypeState, metav1.ConditionTrue,
+		globals.ConditionReasonPendingAlertFiring, globals.ConditionReasonPendingAlertFiringMessage)
+
+	// Update the status of the SearchRule resource
+	globals.UpdateCondition(&searchRule.Status.Conditions, condition)
+}
+
+// UpdateStateAlertPendingResolved updates the status of the SearchRule resource with alert pending resolved condition
+func (r *SearchRuleReconciler) UpdateStateAlertPendingResolved(searchRule *v1alpha1.SearchRule) {
+
+	// Create the new condition with the alert resolved status
+	condition := globals.NewCondition(globals.ConditionTypeState, metav1.ConditionTrue,
+		globals.ConditionReasonPendingAlertResolved, globals.ConditionReasonPendingAlertResolvedMessage)
 
 	// Update the status of the SearchRule resource
 	globals.UpdateCondition(&searchRule.Status.Conditions, condition)

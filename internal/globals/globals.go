@@ -45,10 +45,16 @@ const (
 	ConditionReasonStateSuccessMessage = "Success executing tasks"
 
 	// Alert firing and resolved status messages
-	ConditionReasonAlertFiring          = "AlertFiring"
-	ConditionReasonAlertFiringMessage   = "Alert is firing"
-	ConditionReasonAlertResolved        = "AlertResolved"
-	ConditionReasonAlertResolvedMessage = "Alert is resolved"
+	ConditionReasonAlertFiring                 = "AlertFiring"
+	ConditionReasonAlertFiringMessage          = "Alert is firing"
+	ConditionReasonAlertResolved               = "AlertResolved"
+	ConditionReasonAlertResolvedMessage        = "Alert is resolved"
+	ConditionReasonPendingAlertFiringMessage   = "Pending alert firing"
+	ConditionReasonPendingAlertFiring          = "PendingAlertFiring"
+	ConditionReasonPendingAlertResolvedMessage = "Pending alert resolved"
+	ConditionReasonPendingAlertResolved        = "PendingAlertResolved"
+	ConditionReasonStateHealthyType            = "Healthy"
+	ConditionReasonStateHealthyMessage         = "Rule is healthy"
 
 	// No credentials found
 	ConditionReasonNoCredsFoundType    = "NoCredsFound"
