@@ -162,8 +162,7 @@ This is where the magic happens! SearchRules define the conditions to check in y
 
 Here are two quick examples to show you what’s possible:
 
-1️⃣ Simple Match Count Alert
-Trigger an alert when the number of matching documents exceeds a threshold:
+1️⃣ **Simple Match Count Alert**. Trigger an alert when the number of matching documents exceeds a threshold:
 
 ```yaml
 apiVersion: searchruler.prosimcorp.com/v1alpha1
@@ -316,9 +315,10 @@ Here’s an example to show how to configure an Alertmanager-compatible message:
         {{- $alertJson := toJson $alertList }}
         {{- $alertJson }}
 ```
+> [!TIP]
+> 🔍 **Why Use This?**: By customizing the alert message to fit Alertmanager’s structure, you ensure seamless integration and make sure your alerts get delivered exactly the way you need. Plus, with validation enabled, you won’t have to worry about > formatting errors—everything’s checked before it’s sent! 🚀
 
-2️⃣ Average Field Value Alert
-Alert if the average value of a field exceeds a limit (e.g., high response times):
+2️⃣ **Average Field Value Alert**. Alert if the average value of a field exceeds a limit (e.g., high response times):
 ```yaml
 apiVersion: searchruler.prosimcorp.com/v1alpha1
 kind: SearchRule
