@@ -296,6 +296,8 @@ Here’s an example to show how to configure an Alertmanager-compatible message:
         -------------------------------
         ` .object.Spec.Description .value .object.Name .object.Namespace }}
 
+        {{- $description = ((regexReplaceAll "(?m)^[ \\t]+" $description "") | trim) }}
+
         {{- $annotations := dict
         "sent_by" "searchruler"
         "summary" "There are rules firing"

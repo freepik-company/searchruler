@@ -119,27 +119,6 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 				alert.SearchRule.Spec.Description,
 			))
 
-			// Check if the webhook has a validator and execute it when available
-			if resource.Spec.Webhook.Validator != "" {
-
-				// Check if the validator is available
-				_, validatorFound := validatorsMap[resource.Spec.Webhook.Validator]
-				if !validatorFound {
-					return fmt.Errorf(ValidatorNotFoundErrorMessage, resource.Spec.Webhook.Validator)
-				}
-
-				// Execute the validator to the data of the alert
-				validatorResult, validatorHint, err := validatorsMap[resource.Spec.Webhook.Validator](alert.SearchRule.Spec.ActionRef.Data)
-				if err != nil {
-					return fmt.Errorf(ValidationFailedErrorMessage, err.Error())
-				}
-
-				// Check the result of the validator
-				if !validatorResult {
-					return fmt.Errorf(ValidationFailedErrorMessage, validatorHint)
-				}
-			}
-
 			// Add parsed data to the request
 			// object is the SearchRule object and value is the value of the alert
 			// to be accessible in the template
@@ -152,6 +131,30 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 			if err != nil {
 				r.UpdateConditionEvaluateTemplateError(resource)
 				return fmt.Errorf(EvaluateTemplateErrorMessage, err)
+			}
+
+			// Check if the webhook has a validator and execute it when available
+			if resource.Spec.Webhook.Validator != "" {
+
+				// Check if the validator is available
+				_, validatorFound := validatorsMap[resource.Spec.Webhook.Validator]
+				if !validatorFound {
+					r.UpdateConditionEvaluateTemplateError(resource)
+					return fmt.Errorf(ValidatorNotFoundErrorMessage, resource.Spec.Webhook.Validator)
+				}
+
+				// Execute the validator to the data of the alert
+				validatorResult, validatorHint, err := validatorsMap[resource.Spec.Webhook.Validator](parsedMessage)
+				if err != nil {
+					r.UpdateConditionEvaluateTemplateError(resource)
+					return fmt.Errorf(ValidationFailedErrorMessage, err.Error())
+				}
+
+				// Check the result of the validator
+				if !validatorResult {
+					r.UpdateConditionEvaluateTemplateError(resource)
+					return fmt.Errorf(ValidationFailedErrorMessage, validatorHint)
+				}
 			}
 
 			// Add data to the payload of the request
