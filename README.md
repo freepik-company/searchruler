@@ -69,9 +69,6 @@ They are described in the following table:
 | `--leader-elect`                       | Enable leader election for controller manager                                  |        `false`         |
 | `--metrics-secure`                     | If set the metrics endpoint is served securely                                 |        `false`         |
 | `--enable-http2`                       | If set, HTTP/2 will be enabled for the metrirs                                 |        `false`         |
-| `--sources-time-to-resync-informers`   | Interval to resynchronize all resources in the informers                       |         `60s`          |
-| `--sources-time-to-reconcile-watchers` | Time between each reconciliation loop of the watchers                          |         `10s`          |
-| `--sources-time-to-ack-watcher`        | Wait time before marking a watcher as acknowledged (ACK) after it starts       |          `2s`          |
 
 
 ## Examples
