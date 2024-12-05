@@ -5,10 +5,18 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - searchruler.prosimcorp.com
   resources:
-  - QueryConnectors
-  - RulerActions
+  - queryconnectors
+  - ruleractions
   - searchrules
   verbs:
   - create
@@ -21,16 +29,16 @@ rules:
 - apiGroups:
   - searchruler.prosimcorp.com
   resources:
-  - QueryConnectors/finalizers
-  - RulerActions/finalizers
+  - queryconnectors/finalizers
+  - ruleractions/finalizers
   - searchrules/finalizers
   verbs:
   - update
 - apiGroups:
   - searchruler.prosimcorp.com
   resources:
-  - QueryConnectors/status
-  - RulerActions/status
+  - queryconnectors/status
+  - ruleractions/status
   - searchrules/status
   verbs:
   - get

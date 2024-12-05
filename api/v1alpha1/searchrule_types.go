@@ -21,9 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // Elasticsearch TODO
 type Elasticsearch struct {
 	Index string `json:"index"`
@@ -69,6 +66,9 @@ type SearchRuleStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"ResourceSynced\")].status",description=""
+// +kubebuilder:printcolumn:name="AlertStatus",type="string",JSONPath=".status.conditions[?(@.type==\"State\")].reason",description=""
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description=""
 
 // SearchRule is the Schema for the searchrules API.
 type SearchRule struct {

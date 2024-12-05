@@ -53,8 +53,8 @@ const (
 	ConditionReasonPendingAlertFiring          = "PendingAlertFiring"
 	ConditionReasonPendingAlertResolvedMessage = "Pending alert resolved"
 	ConditionReasonPendingAlertResolved        = "PendingAlertResolved"
-	ConditionReasonStateHealthyType            = "Healthy"
-	ConditionReasonStateHealthyMessage         = "Rule is healthy"
+	ConditionReasonStateNormalType             = "Normal"
+	ConditionReasonStateNormalMessage          = "Rule is normal"
 
 	// No credentials found
 	ConditionReasonNoCredsFoundType    = "NoCredsFound"

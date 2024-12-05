@@ -164,7 +164,7 @@ spec:
 
 ### 📜 SearchRule
 
-This is where the magic happens! SearchRules define the conditions to check in your log sources (via QueryConnectors) and specify where to send alerts (using RulerActions). You get to decide what matters and how to act on it. 🎯
+This is where the magic happens! SearchRules define the conditions to check in your log sources (via queryconnectors) and specify where to send alerts (using ruleractions). You get to decide what matters and how to act on it. 🎯
 
 Here are two quick examples to show you what’s possible:
 

@@ -323,7 +323,7 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 		return nil
 	}
 
-	r.UpdateStateHealthy(resource)
+	r.UpdateStateNormal(resource)
 	return nil
 }
 

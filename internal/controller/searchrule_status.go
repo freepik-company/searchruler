@@ -45,12 +45,12 @@ func (r *SearchRuleReconciler) UpdateConditionKubernetesApiCallFailure(SearchRul
 	globals.UpdateCondition(&SearchRule.Status.Conditions, condition)
 }
 
-// UpdateStateHealthy updates the status of the SearchRule resource with a Healthy condition
-func (r *SearchRuleReconciler) UpdateStateHealthy(SearchRule *v1alpha1.SearchRule) {
+// UpdateStateNormal updates the status of the SearchRule resource with a Normal condition
+func (r *SearchRuleReconciler) UpdateStateNormal(SearchRule *v1alpha1.SearchRule) {
 
-	// Create the new condition with the Healthy status
+	// Create the new condition with the Normal status
 	condition := globals.NewCondition(globals.ConditionTypeState, metav1.ConditionTrue,
-		globals.ConditionReasonStateHealthyType, globals.ConditionReasonStateHealthyMessage)
+		globals.ConditionReasonStateNormalType, globals.ConditionReasonStateNormalMessage)
 
 	// Update the status of the SearchRule resource
 	globals.UpdateCondition(&SearchRule.Status.Conditions, condition)

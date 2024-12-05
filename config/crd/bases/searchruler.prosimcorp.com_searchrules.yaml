@@ -14,7 +14,17 @@ spec:
     singular: searchrule
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="ResourceSynced")].status
+      name: Ready
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="State")].reason
+      name: AlertStatus
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: SearchRule is the Schema for the searchrules API.

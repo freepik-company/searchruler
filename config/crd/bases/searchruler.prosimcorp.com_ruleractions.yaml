@@ -14,10 +14,20 @@ spec:
     singular: ruleraction
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="ResourceSynced")].status
+      name: Ready
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="State")].reason
+      name: Status
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: RulerAction is the Schema for the RulerActions API.
+        description: RulerAction is the Schema for the ruleractions API.
         properties:
           apiVersion:
             description: |-
