@@ -59,6 +59,9 @@ const (
 
 	// kubeEvent
 	kubeEventReasonAlertFiring = "AlertFiring"
+
+	// Elasticsearch aggregation field
+	elasticAggregationsField = "aggregations"
 )
 
 var (
@@ -202,6 +205,14 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 		)
 	}
 
+	// Save elastic response if the result has aggregations, this allows user
+	// to use the response in the action
+	aggregationsResource := interface{}(nil)
+	aggregationsResponse := gjson.Get(string(responseBody), elasticAggregationsField)
+	if aggregationsResponse.Exists() {
+		aggregationsResource = aggregationsResponse.Value()
+	}
+
 	// Evaluate condition and check if the alert is firing or not
 	firing, err := evaluateCondition(conditionValue.Float(), resource.Spec.Condition.Operator, resource.Spec.Condition.Threshold)
 	if err != nil {
@@ -254,6 +265,7 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 				RulerActionName: resource.Spec.ActionRef.Name,
 				SearchRule:      *resource,
 				Value:           conditionValue.Float(),
+				Aggregations:    aggregationsResource,
 			})
 
 			// Create an event in Kubernetes of AlertFiring. This event will be readed by the RulerAction controller

@@ -125,6 +125,7 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 			templateInjectedObject := map[string]interface{}{}
 			templateInjectedObject["value"] = alert.Value
 			templateInjectedObject["object"] = alert.SearchRule
+			templateInjectedObject["aggregations"] = alert.Aggregations
 
 			// Evaluate the data template with the injected object
 			parsedMessage, err := template.EvaluateTemplate(alert.SearchRule.Spec.ActionRef.Data, templateInjectedObject)

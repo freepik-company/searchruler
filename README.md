@@ -253,8 +253,8 @@ spec:
   actionRef:
     name: ruleraction-sample
     # Message template to send in the RuleAction execution. It is a Go template with the
-    # object and value variables. The object variable is the SearchRule object and the
-    # value variable is the value of the conditionField.
+    # object, value and, if exists, elasticsearch aggregations field variables. The object 
+    # variable is the SearchRule object and the value variable is the value of the conditionField.
 
     # If the ruleaction is a alertmanager webhook, the message must be in alertmanager format:
     # https://prometheus.io/docs/alerting/latest/clients/
@@ -283,8 +283,8 @@ Here’s an example to show how to configure an Alertmanager-compatible message:
   actionRef:
     name: ruleraction-sample
     # Message template to send in the RuleAction execution. It is a Go template with the
-    # object and value variables. The object variable is the SearchRule object and the
-    # value variable is the value of the conditionField.
+    # object, value and, if exists, elasticsearch aggregations field variables. The object 
+    # variable is the SearchRule object and the value variable is the value of the conditionField.
 
     # If the ruleaction is a alertmanager webhook, the message must be in alertmanager format:
     # https://prometheus.io/docs/alerting/latest/clients/
@@ -292,19 +292,27 @@ Here’s an example to show how to configure an Alertmanager-compatible message:
         {{- $now := now | date "2006-01-02T15:04:05Z07:00" }}
         {{- $object := .object -}}
         {{- $value := .value -}}
+        {{- $aggregations := .aggregations -}}
 
         {{- $alertList := list }}
+
+        {{- $bucketsStr := "" }}
+        {{- range .aggregations.hosts.buckets }}
+          {{- $bucketInfo := printf "Number of documents -> %v, Response time -> %v" .doc_count .total_response_time.value }}
+          {{- $bucketsStr = printf "%s\n%s" $bucketsStr $bucketInfo }}
+        {{- end }}
 
         {{- $description := printf `
 
         Description: %s
         Value: %v
+        Aggregations values: %s
 
         -------------------------------
         Name: %s
         Namespace: %s
         -------------------------------
-        ` .object.Spec.Description .value .object.Name .object.Namespace }}
+        ` .object.Spec.Description .value $bucketStr .object.Name .object.Namespace }}
 
         {{- $description = ((regexReplaceAll "(?m)^[ \\t]+" $description "") | trim) }}
 
@@ -390,8 +398,8 @@ spec:
   actionRef:
     name: ruleraction-sample
     # Message template to send in the RuleAction execution. It is a Go template with the
-    # object and value variables. The object variable is the SearchRule object and the
-    # value variable is the value of the conditionField.
+    # object, value and, if exists, elasticsearch aggregations field variables. The object 
+    # variable is the SearchRule object and the value variable is the value of the conditionField.
 
     # If the ruleaction is a alertmanager webhook, the message must be in alertmanager format:
     # https://prometheus.io/docs/alerting/latest/clients/
@@ -419,6 +427,17 @@ already know from [Helm Template](https://helm.sh/docs/chart_template_guide/func
 When a rule is firing, the data field is the one which the `RulerAction` will fire to the webhook. You can access many data for creating the message template like:
 * `.object`: The `SearchRule` manifest.
 * `.value`: The value of the query which detonates the alert firing.
+* `.aggregations`: The value of elasticsearch aggregation response if exists. We transform the JSON response of elasticsearch into an structure to be queried in your template. For example, for queries with aggregations, the value of this field will be like:
+  ```
+  aggregationName:
+    doc_count_error_upper_bound: 2
+    sum_other_doc_count: 120
+    buckets:
+    - key: key1
+      doc_count: 100
+    - key: key2
+      doc_count: 200
+  ```
 
 This means that the objects can be accessed or stored in variables in the following way:
 ```yaml
@@ -434,10 +453,14 @@ spec:
     name: ruleraction-sample
     data: |
       {{- $object := .object -}}
-      {{- $value := .value -}}       
+      {{- $value := .value -}}    
+      {{- $aggregationValues := .aggregations.buckets }}   
       {{ printf "Name: %s" $object.Name }}
       {{ printf "Description: %s" $object.Spec.Description }}
       {{ printf "Current value: %v" $value }}
+      {{- range $aggregationValues }}
+      {{ printf "%s: %s", .key .doc_count }}
+      {{- end }}
 ```
 
 > Remember: with a big power comes a big responsibility

@@ -27,6 +27,7 @@ type Alert struct {
 	RulerActionName string
 	SearchRule      v1alpha1.SearchRule
 	Value           float64
+	Aggregations    interface{}
 }
 
 // AlertsStore

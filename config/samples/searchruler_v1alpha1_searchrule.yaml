@@ -101,8 +101,8 @@ spec:
   actionRef:
     name: ruleraction-sample
     # Message template to send in the RuleAction execution. It is a Go template with the
-    # object and value variables. The object variable is the SearchRule object and the
-    # value variable is the value of the conditionField.
+    # object, value and, if exists, elasticsearch aggregations field variables. The object 
+    # variable is the SearchRule object and the value variable is the value of the conditionField.
 
     # If the ruleaction is a alertmanager webhook, the message must be in alertmanager format:
     # https://prometheus.io/docs/alerting/latest/clients/
