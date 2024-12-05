@@ -54,7 +54,7 @@ resources:
 - https://github.com/prosimcorp/searchruler/releases/download/v0.1.0/install.yaml
 ```
 
-> 🧚🏼 **Hey, listen! If you prefer to deploy using Helm, go to the [Helm registry](https://prosimcorp.github.io/searchruler/)**
+> 🧚🏼 **Hey, listen! If you prefer to deploy using Helm, go to the [Helm registry](https://prosimcorp.github.io/helm-charts/)**
 
 
 ## Flags
