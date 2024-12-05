@@ -239,7 +239,7 @@ spec:
     # { "hits": "total": { "value": 100 }, hits: [ ... ] }
     # hits.total.value checks the total hits of the query
     # Underhood searchruler uses GJson to get this conditionField to check, so if you
-    # want to get a value from an array you can use aggregations.hosts.buckets.#.total_response_time.value
+    # want to get a value from an array you can use aggregations.hosts.buckets.#.total_response_time.value@values|#(>100)
     conditionField: "hits.total.value"
 
   # Condition for the rule evaluation. It will check the conditionField value with the
@@ -272,6 +272,10 @@ spec:
 >[!TIP]
 > Underhood searchrule uses in `conditionField` field `GJson` library, so you can use whatever expression you
 > want for GJson to check your JSONs responded by Elasticsearch. Here you have a debugger --> https://gjson.dev/
+
+>[!IMPORTANT]
+> By the moment, `conditionField` MUST return just a single value (number or float),
+> it is not prepared for array elements. But it's just by the moment, we are working hard to implement it :D 
 
 #### 📩 Customizing Alert Messages for Alertmanager
 In the `actionRef.data` field, you define the message that gets sent to your webhook. If your webhook is Alertmanager, you'll need to structure the message according to Alertmanager's format. Plus, you can enable the validator in the RulerAction to ensure everything’s correctly formatted.
