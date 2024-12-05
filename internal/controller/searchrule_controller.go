@@ -46,7 +46,7 @@ type SearchRuleReconciler struct {
 // +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=searchrules/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=searchrules/finalizers,verbs=update
 
-// +kubebuilder:rbac:groups="",resources=events,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups="events.k8s.io",resources=events,verbs=get;list;watch;create;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
