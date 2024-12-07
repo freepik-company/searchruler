@@ -45,10 +45,10 @@ import (
 const (
 
 	// Rule states
-	ruleHealthyState         = "Healthy"
+	ruleNormalState          = "Normal"
 	ruleFiringState          = "Firing"
 	rulePendingFiringState   = "PendingFiring"
-	rulePendingResolvedState = "PendingResolved"
+	rulePendingResolvedState = "PendingResolving"
 
 	// Conditions
 	conditionGreaterThan        = "greaterThan"
@@ -108,6 +108,13 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 			r.UpdateConditionNoCredsFound(resource)
 			return fmt.Errorf(MissingCredentialsMessage, key)
 		}
+	}
+
+	// Get `for` duration for the rules firing. When rule is firing during this for time,
+	// then the rule is really ocurring and must be an alert
+	forDuration, err := time.ParseDuration(resource.Spec.Condition.For)
+	if err != nil {
+		return fmt.Errorf(ForValueParseErrorMessage, err)
 	}
 
 	// Check if query is defined in the resource
@@ -212,32 +219,37 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 		)
 	}
 
-	// Get ruleKey for the pool <namespace>/<name> and get rule from the pool if exists
+	// Get ruleKey for the pool <namespace>_<name> and get rule from the pool if exists
 	// If not, create a default skeleton rule and save it to the pool
-	ruleKey := fmt.Sprintf("%s/%s", resource.Namespace, resource.Name)
+	ruleKey := fmt.Sprintf("%s_%s", resource.Namespace, resource.Name)
 	rule, ruleInPool := r.RulesPool.Get(ruleKey)
 	if !ruleInPool {
 		// Initialize rule with default values
 		rule = &pools.Rule{
+			SearchRule:    *resource,
 			FiringTime:    time.Time{},
-			State:         ruleHealthyState,
+			State:         ruleNormalState,
 			ResolvingTime: time.Time{},
+			Value:         conditionValue.Float(),
 		}
 		r.RulesPool.Set(ruleKey, rule)
 	}
 
-	// Get `for` duration for the rules firing. When rule is firing during this for time,
-	// then the rule is really ocurring and must be an alert
-	forDuration, err := time.ParseDuration(resource.Spec.Condition.For)
-	if err != nil {
-		return fmt.Errorf(ForValueParseErrorMessage, err)
+	// Check if resource is sync with the pool
+	if !reflect.DeepEqual(rule.SearchRule, *resource) {
+		rule.SearchRule = *resource
+		r.RulesPool.Set(ruleKey, rule)
 	}
+
+	// Set the current value of the condition to the rule
+	rule.Value = conditionValue.Float()
+	r.RulesPool.Set(ruleKey, rule)
 
 	// If rule is firing right now
 	if firing {
 
 		// If rule is not set as firing in the pool, set start fireTime and state PendingFiring
-		if rule.State == ruleHealthyState || rule.State == rulePendingResolvedState {
+		if rule.State == ruleNormalState || rule.State == rulePendingResolvedState {
 			rule.FiringTime = time.Now()
 			rule.State = rulePendingFiringState
 			r.RulesPool.Set(ruleKey, rule)
@@ -249,7 +261,7 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 			r.RulesPool.Set(ruleKey, rule)
 
 			// Add alert to the pool with the value, the object and the rulerAction name which will trigger the alert
-			alertKey := fmt.Sprintf("%s/%s", resource.Namespace, resource.Name)
+			alertKey := fmt.Sprintf("%s_%s", resource.Namespace, resource.Name)
 			r.AlertsPool.Set(alertKey, &pools.Alert{
 				RulerActionName: resource.Spec.ActionRef.Name,
 				SearchRule:      *resource,
@@ -285,7 +297,7 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 	}
 
 	// If alert is not firing right now and it is not in healthy state
-	if !firing && rule.State != ruleHealthyState {
+	if !firing && rule.State != ruleNormalState {
 
 		// If rule is not marked as resolving in the pool, change state to PendingResolved and set resolvingTime now
 		if rule.State != rulePendingResolvedState {
@@ -304,15 +316,17 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 			// Restore rule to default values
 			rule = &pools.Rule{
 				FiringTime:    time.Time{},
-				State:         ruleHealthyState,
+				State:         ruleNormalState,
 				ResolvingTime: time.Time{},
+				SearchRule:    *resource,
+				Value:         conditionValue.Float(),
 			}
 			r.RulesPool.Set(ruleKey, rule)
 
 			// Log and update the AlertStatus to Resolved
-			r.UpdateConditionAlertResolved(resource)
+			r.UpdateStateNormal(resource)
 			logger.Info(fmt.Sprintf(
-				"Rule %s is in resolved state. Current value is %v",
+				"Rule %s is in normal state. Current value is %v",
 				resource.Name,
 				conditionValue,
 			))

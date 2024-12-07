@@ -19,13 +19,17 @@ package pools
 import (
 	"sync"
 	"time"
+
+	"prosimcorp.com/SearchRuler/api/v1alpha1"
 )
 
 // Rule
 type Rule struct {
+	SearchRule    v1alpha1.SearchRule
 	FiringTime    time.Time
 	ResolvingTime time.Time
 	State         string
+	Value         float64
 }
 
 // RulesStore

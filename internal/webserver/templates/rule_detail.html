@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rule status</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+        }
+        header {
+            background-color: #2047c6;
+            color: white;
+            padding: 10px;
+            text-align: center;
+        }
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            background-color: white;
+            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+            border-radius: 5px;
+            padding: 20px;
+        }
+        .rule-header {
+            margin-bottom: 20px;
+        }
+        .rule-header h2 {
+            margin: 0;
+        }
+        .bold {
+            font-weight: bold;
+        }
+        .pending {
+            color: orange;
+            font-weight: bold;
+        }
+        .firing {
+            color: red;
+            font-weight: bold;
+        }
+        .normal {
+            color: green;
+            font-weight: bold;
+        }
+        .manifest {
+            background-color: #f8f8f8;
+            padding: 10px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+        a.back {
+            display: inline-block;
+            margin-top: 20px;
+            color: #2047c6;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        a.back:hover {
+            color: #2908e2;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Rule status</h1>
+    </header>
+    <div class="container">
+        <div class="rule-header">
+            <h2>Rule: {{ .Key }}</h2>
+            <p>State: 
+                {{if or (eq .State "PendingFiring") (eq .State "PendingResolving")}}<span class="pending">{{ .State }}</span>{{end}}
+                {{if eq .State "Firing"}}<span class="firing">{{ .State }}</span>{{end}}
+                {{if eq .State "Normal"}}<span class="normal">{{ .State }}</span>{{end}}
+            </p>
+            <p>FiringTime :<span class="bold">{{if eq .FiringTime.String "0001-01-01 00:00:00 +0000 UTC"}}-{{else}}{{ .FiringTime.Format "2006-01-02 15:04:05"}}{{end}}</span></p>
+            <p>ResolvingTime: <span class="bold">{{if eq .ResolvingTime.String "0001-01-01 00:00:00 +0000 UTC"}}-{{else}}{{ .ResolvingTime.Format "2006-01-02 15:04:05"}}{{end}}</span></p>
+            <p>ConditionField: <span class="bold">{{ .ConditionField }}</span></p>
+            <p>Current value: <span class="bold">{{ .Value }}</span></p>
+            <p>Description: <span class="bold">{{ .Description }}</span></p>
+            <p>QueryConnector: <span class="bold">{{ .QueryConnector }}</span></p>
+            <p>Index: <span class="bold">{{ .Index }}</span></p>
+            <p>CheckInterval: <span class="bold">{{ .CheckInterval }}</span></p>
+        </div>
+        <h3>Query:</h3>
+        <div class="manifest">
+            <pre>{{ printf "%s" .Query }}</pre>
+        </div>
+        <h3>Condition:</h3>
+        <div class="manifest">
+            <pre>{{ printf "%s" .Condition }}</pre>
+        </div>
+        <h3>ActionRef:</h3>
+        <div class="manifest">
+            <pre>{{ printf "%s" .ActionRef }}</pre>
+        </div>
+        <a href="/rules" class="back">← Return global rules</a>
+    </div>
+</body>
+</html>

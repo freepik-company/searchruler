@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rules</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+        }
+        header {
+            background-color: #2047c6;
+            color: white;
+            padding: 10px;
+            text-align: center;
+        }
+        table {
+            width: 90%;
+            margin: 20px auto;
+            border-collapse: collapse;
+            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        th, td {
+            border: 1px solid #ddd;
+            text-align: left;
+            padding: 10px;
+        }
+        th {
+            background-color: #2047c6;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+        .pending {
+            color: orange;
+            font-weight: bold;
+        }
+        .firing {
+            color: red;
+            font-weight: bold;
+        }
+        .normal {
+            color: green;
+            font-weight: bold;
+        }
+        .btn-details {
+            cursor: pointer;
+            color: #007bff;
+            text-decoration: underline;
+        }
+        .btn-details:hover {
+            color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Rules</h1>
+    </header>
+    <table>
+        <thead>
+            <tr>
+                <th>Rulename</th>
+                <th>FiringTime</th>
+                <th>ResolvingTime</th>
+                <th>Description</th>
+                <th>Current value</th>
+                <th>State</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range $key, $value := .Rules}}
+            <tr>
+                <td><a href="/rules/{{ $key }}" class="btn-details">{{ $key }}</a></td>
+                <td>
+                    {{if eq $value.FiringTime.String "0001-01-01 00:00:00 +0000 UTC"}}
+                        -
+                    {{else}}
+                        {{ $value.FiringTime.Format "2006-01-02 15:04:05"}}
+                    {{end}}
+                </td>     
+                <td>
+                    {{if eq $value.ResolvingTime.String "0001-01-01 00:00:00 +0000 UTC"}}
+                        -
+                    {{else}}
+                        {{ $value.ResolvingTime.Format "2006-01-02 15:04:05"}}
+                    {{end}}
+                </td>                
+                <td>{{ $value.SearchRule.Spec.Description }}</td>
+                <td>{{ $value.Value }}</td>
+                <td>
+                    {{if or (eq $value.State "PendingFiring") (eq $value.State "PendingResolving")}}<span class="pending">{{ $value.State }}</span>{{end}}
+                    {{if eq $value.State "Firing"}}<span class="firing">{{ $value.State }}</span>{{end}}
+                    {{if eq $value.State "Normal"}}<span class="normal">{{ $value.State }}</span>{{end}}
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+        
+    </table>
+</body>
+</html>
