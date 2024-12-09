@@ -175,7 +175,7 @@ func main() {
 		}
 		// Create webserver for the application
 		go func() {
-			webserver.RunWebserver(context.TODO(), webserverConfig, RulesPool, AlertsPool)
+			webserver.RunWebserver(context.TODO(), webserverConfig, RulesPool)
 		}()
 	}
 

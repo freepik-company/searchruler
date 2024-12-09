@@ -4,65 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rules</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f9f9f9;
-        }
-        header {
-            background-color: #2047c6;
-            color: white;
-            padding: 10px;
-            text-align: center;
-        }
-        table {
-            width: 90%;
-            margin: 20px auto;
-            border-collapse: collapse;
-            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
-        }
-        th, td {
-            border: 1px solid #ddd;
-            text-align: left;
-            padding: 10px;
-        }
-        th {
-            background-color: #2047c6;
-            color: white;
-        }
-        tr:nth-child(even) {
-            background-color: #f2f2f2;
-        }
-        tr:hover {
-            background-color: #f1f1f1;
-        }
-        .pending {
-            color: orange;
-            font-weight: bold;
-        }
-        .firing {
-            color: red;
-            font-weight: bold;
-        }
-        .normal {
-            color: green;
-            font-weight: bold;
-        }
-        .btn-details {
-            cursor: pointer;
-            color: #007bff;
-            text-decoration: underline;
-        }
-        .btn-details:hover {
-            color: #0056b3;
-        }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
     <header>
-        <h1>Rules</h1>
+        <a href="/"><img src="/static/logo.png" alt="Logo"></a>
+        <h1>Rules Dashboard</h1>
     </header>
     <table>
         <thead>
@@ -71,7 +20,7 @@
                 <th>FiringTime</th>
                 <th>ResolvingTime</th>
                 <th>Description</th>
-                <th>Current value</th>
+                <th>Current Value</th>
                 <th>State</th>
             </tr>
         </thead>
@@ -103,7 +52,6 @@
             </tr>
             {{end}}
         </tbody>
-        
     </table>
 </body>
 </html>

@@ -14,6 +14,8 @@ import (
 	"github.com/gofiber/template/html/v2"
 )
 
+// states is a map of the states of the rules and their respective status used for
+// the rules API endpoint
 var (
 	states = map[string]string{
 		"PendingFiring":    "pending",
@@ -23,7 +25,8 @@ var (
 	}
 )
 
-func RunWebserver(ctx context.Context, config WebserverConfig, rulesPool *pools.RulesStore, alertsPool *pools.AlertsStore) error {
+// RunWebserver starts a webserver that serves the rule pages
+func RunWebserver(ctx context.Context, config WebserverConfig, rulesPool *pools.RulesStore) error {
 	logger := log.FromContext(ctx)
 
 	logger.Info(fmt.Sprintf("Starting webserver in %s:%d", config.ListenAddr, config.Port))
@@ -32,6 +35,7 @@ func RunWebserver(ctx context.Context, config WebserverConfig, rulesPool *pools.
 	_, b, _, _ := runtime.Caller(0)
 	basePath := filepath.Dir(b)
 	templatePath := filepath.Join(basePath, "templates")
+	staticPath := filepath.Join(basePath, "static")
 
 	// Create a new Fiber app with the HTML template engine
 	engine := html.New(templatePath, ".html")
@@ -40,9 +44,14 @@ func RunWebserver(ctx context.Context, config WebserverConfig, rulesPool *pools.
 	})
 
 	// Define the routes
+	// "/" redirets to "/rules"
+	app.Get("/", func(c *fiber.Ctx) error {
+		return c.Redirect("/rules")
+	})
 	app.Get("/rules", getRules(rulesPool))
 	app.Get("/api/rules", getRulesJSON(rulesPool))
-	app.Get("/rules/:key", getRule(rulesPool, alertsPool))
+	app.Get("/rules/:key", getRule(rulesPool))
+	app.Static("/static", staticPath)
 
 	// Start the webserver
 	if err := app.Listen(fmt.Sprintf("%s:%d", config.ListenAddr, config.Port)); err != nil {
@@ -53,18 +62,12 @@ func RunWebserver(ctx context.Context, config WebserverConfig, rulesPool *pools.
 }
 
 // getRule returns a handler function that renders the rule detail page
-func getRule(rulesPool *pools.RulesStore, alertsPool *pools.AlertsStore) func(c *fiber.Ctx) error {
+func getRule(rulesPool *pools.RulesStore) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		key := c.Params("key")
 
 		// Get the rule from the pool
 		rule, exists := rulesPool.Get(key)
-		if !exists {
-			return c.Status(fiber.StatusNotFound).SendString("Rule not found")
-		}
-
-		// Get the alert from the pool
-		alert, exists := alertsPool.Get(key)
 		if !exists {
 			return c.Status(fiber.StatusNotFound).SendString("Rule not found")
 		}
@@ -81,20 +84,11 @@ func getRule(rulesPool *pools.RulesStore, alertsPool *pools.AlertsStore) func(c 
 
 		// Render the rule detail page
 		return c.Render("rule_detail", fiber.Map{
-			"Key":            key,
-			"State":          rule.State,
-			"FiringTime":     rule.FiringTime,
-			"ResolvingTime":  rule.ResolvingTime,
-			"Description":    rule.SearchRule.Spec.Description,
-			"QueryConnector": rule.SearchRule.Spec.QueryConnectorRef.Name,
-			"CheckInterval":  rule.SearchRule.Spec.CheckInterval,
-			"Query":          rule.SearchRule.Spec.Elasticsearch.Query.Raw,
-			"Index":          rule.SearchRule.Spec.Elasticsearch.Index,
-			"Condition":      condition,
-			"ActionRef":      actionRef,
-			"ConditionField": rule.SearchRule.Spec.Elasticsearch.ConditionField,
-			"Value":          rule.Value,
-			"Aggregations":   alert})
+			"Key":       key,
+			"Rule":      rule,
+			"Condition": condition,
+			"ActionRef": actionRef,
+		})
 	}
 }
 
