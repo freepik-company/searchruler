@@ -26,10 +26,10 @@ var (
 )
 
 // RunWebserver starts a webserver that serves the rule pages
-func RunWebserver(ctx context.Context, config WebserverConfig, rulesPool *pools.RulesStore) error {
+func RunWebserver(ctx context.Context, webserverAddr string, rulesPool *pools.RulesStore) error {
 	logger := log.FromContext(ctx)
 
-	logger.Info(fmt.Sprintf("Starting webserver in %s:%d", config.ListenAddr, config.Port))
+	logger.Info(fmt.Sprintf("Starting webserver in %s", webserverAddr))
 
 	// Get the path of templates folder with the HTML files
 	_, b, _, _ := runtime.Caller(0)
@@ -54,7 +54,7 @@ func RunWebserver(ctx context.Context, config WebserverConfig, rulesPool *pools.
 	app.Static("/static", staticPath)
 
 	// Start the webserver
-	if err := app.Listen(fmt.Sprintf("%s:%d", config.ListenAddr, config.Port)); err != nil {
+	if err := app.Listen(webserverAddr); err != nil {
 		return err
 	}
 

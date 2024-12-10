@@ -69,9 +69,7 @@ They are described in the following table:
 | `--leader-elect`                       | Enable leader election for controller manager                                  |        `false`         |
 | `--metrics-secure`                     | If set the metrics endpoint is served securely                                 |        `false`         |
 | `--enable-http2`                       | If set, HTTP/2 will be enabled for the metrirs                                 |        `false`         |
-| `--enable-webserver`                   | If set, webserver will be enabled for watch rule status                        |        `true`          |
-| `--webserver-port`                     | Webserver listen port                                                          |        `8080`          |
-| `--webserver-listen-addr`              | Webserver listen address                                                       |        `127.0.0.1`     |
+| `--webserver-address`                  | Webserver listen address.  </br> 0 disables the webserver                      |          `0`           |
 
 
 ## Examples

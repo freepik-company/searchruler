@@ -73,9 +73,7 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
-	var enableWebserver bool
-	var webserverPort int
-	var webserverListenAddr string
+	var webserverAddr string
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -87,11 +85,8 @@ func main() {
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	flag.BoolVar(&enableWebserver, "enable-webserver", true,
-		"If set, the webserver will be enabled")
-	flag.IntVar(&webserverPort, "webserver-port", 8080, "The port the webserver will bind to")
-	flag.StringVar(&webserverListenAddr, "webserver-listen-addr", "127.0.0.1",
-		"The address the webserver will bind to")
+	flag.StringVar(&webserverAddr, "webserver-address", "0",
+		"The address the webserver will bind to. Use :8443 for HTTPS or :8080 for HTTP or leave as 0 to disable the webserver.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -167,15 +162,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create webserver configuration
-	if enableWebserver {
-		webserverConfig := webserver.WebserverConfig{
-			Port:       webserverPort,
-			ListenAddr: webserverListenAddr,
-		}
+	if webserverAddr != "0" {
 		// Create webserver for the application
 		go func() {
-			webserver.RunWebserver(context.TODO(), webserverConfig, RulesPool)
+			webserver.RunWebserver(context.TODO(), webserverAddr, RulesPool)
 		}()
 	}
 
