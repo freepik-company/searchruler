@@ -3,6 +3,7 @@ package webserver
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 
@@ -34,8 +35,20 @@ func RunWebserver(ctx context.Context, webserverAddr string, rulesPool *pools.Ru
 	// Get the path of templates folder with the HTML files
 	_, b, _, _ := runtime.Caller(0)
 	basePath := filepath.Dir(b)
-	templatePath := filepath.Join(basePath, "templates")
-	staticPath := filepath.Join(basePath, "static")
+
+	// If the environment is production, use the executable path as basePath
+	if os.Getenv("APP_ENV") == "production" {
+		// For production environments
+		execPath, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("error getting the path of the executable: %w", err)
+		}
+		basePath = filepath.Dir(execPath)
+	}
+
+	// Usar la ruta del ejecutable como basePath
+	templatePath := filepath.Join(basePath, "static/templates")
+	publicPath := filepath.Join(basePath, "static/public")
 
 	// Create a new Fiber app with the HTML template engine
 	engine := html.New(templatePath, ".html")
@@ -51,7 +64,7 @@ func RunWebserver(ctx context.Context, webserverAddr string, rulesPool *pools.Ru
 	app.Get("/rules", getRules(rulesPool))
 	app.Get("/api/rules", getRulesJSON(rulesPool))
 	app.Get("/rules/:key", getRule(rulesPool))
-	app.Static("/static", staticPath)
+	app.Static("/static", publicPath)
 
 	// Start the webserver
 	if err := app.Listen(webserverAddr); err != nil {
