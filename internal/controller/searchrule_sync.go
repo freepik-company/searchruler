@@ -78,7 +78,7 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 	// If the eventType is Deleted, remove the rule from the rules pool and from the alerts pool
 	// In other cases, execute Sync logic
 	if eventType == watch.Deleted {
-		key := fmt.Sprintf("%s/%s", resource.Namespace, resource.Name)
+		key := fmt.Sprintf("%s_%s", resource.Namespace, resource.Name)
 		r.RulesPool.Delete(key)
 		r.AlertsPool.Delete(key)
 		return nil
@@ -102,7 +102,7 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 
 	// Get credentials for QueryConnector attached if defined
 	if !reflect.ValueOf(QueryConnectorResource.Spec.Credentials).IsZero() {
-		key := fmt.Sprintf("%s/%s", resource.Namespace, QueryConnectorResource.Name)
+		key := fmt.Sprintf("%s_%s", resource.Namespace, QueryConnectorResource.Name)
 		queryConnectorCreds, credsExists = r.QueryConnectorCredentialsPool.Get(key)
 		if !credsExists {
 			r.UpdateConditionNoCredsFound(resource)
@@ -310,7 +310,7 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 		if time.Since(rule.ResolvingTime) > forDuration {
 
 			// Remove alert from the pool
-			alertKey := fmt.Sprintf("%s/%s", resource.Namespace, resource.Name)
+			alertKey := fmt.Sprintf("%s_%s", resource.Namespace, resource.Name)
 			r.AlertsPool.Delete(alertKey)
 
 			// Restore rule to default values
