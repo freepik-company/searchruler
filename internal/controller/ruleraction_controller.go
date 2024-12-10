@@ -23,8 +23,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
+	"prosimcorp.com/SearchRuler/internal/globals"
 	"prosimcorp.com/SearchRuler/internal/pools"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -145,10 +147,13 @@ processEvent:
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *RulerActionReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// Just watch for SearchRuler event resources that starts with "searchruler-alert-"
+	prefixFilter := globals.PrefixFilterPredicate{Prefix: "searchruler-alert-"}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&searchrulerv1alpha1.RulerAction{}).
 		Named("RulerAction").
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
-		Watches(&corev1.Event{}, &handler.EnqueueRequestForObject{}). // Also watch for events, so SearchRule controller throws events when a rule is firing
+		Watches(&corev1.Event{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(prefixFilter)). // Also watch for events, so SearchRule controller throws events when a rule is firing
 		Complete(r)
 }
