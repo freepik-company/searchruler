@@ -67,17 +67,6 @@ func (r *SearchRuleReconciler) UpdateConditionAlertFiring(searchRule *v1alpha1.S
 	globals.UpdateCondition(&searchRule.Status.Conditions, condition)
 }
 
-// UpdateConditionNoCredsFound updates the status of the SearchRule resource with alert resolved condition
-func (r *SearchRuleReconciler) UpdateConditionAlertResolved(searchRule *v1alpha1.SearchRule) {
-
-	// Create the new condition with the alert resolved status
-	condition := globals.NewCondition(globals.ConditionTypeState, metav1.ConditionTrue,
-		globals.ConditionReasonAlertResolved, globals.ConditionReasonAlertResolvedMessage)
-
-	// Update the status of the SearchRule resource
-	globals.UpdateCondition(&searchRule.Status.Conditions, condition)
-}
-
 // UpdateStateAlertPendingFiring updates the status of the SearchRule resource with alert pending firing condition
 func (r *SearchRuleReconciler) UpdateStateAlertPendingFiring(searchRule *v1alpha1.SearchRule) {
 

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rules</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <header>
+        <a href="/"><img src="/static/logo.png" alt="Logo"></a>
+        <h1>Rules Dashboard</h1>
+    </header>
+    <table>
+        <thead>
+            <tr>
+                <th>Rulename</th>
+                <th>FiringTime</th>
+                <th>ResolvingTime</th>
+                <th>Description</th>
+                <th>Current Value</th>
+                <th>State</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range $key, $value := .Rules}}
+            <tr>
+                <td><a href="/rules/{{ $key }}" class="btn-details">{{ $key }}</a></td>
+                <td>
+                    {{if eq $value.FiringTime.String "0001-01-01 00:00:00 +0000 UTC"}}
+                        -
+                    {{else}}
+                        {{ $value.FiringTime.Format "2006-01-02 15:04:05"}}
+                    {{end}}
+                </td>     
+                <td>
+                    {{if eq $value.ResolvingTime.String "0001-01-01 00:00:00 +0000 UTC"}}
+                        -
+                    {{else}}
+                        {{ $value.ResolvingTime.Format "2006-01-02 15:04:05"}}
+                    {{end}}
+                </td>                
+                <td>{{ $value.SearchRule.Spec.Description }}</td>
+                <td>{{ $value.Value }}</td>
+                <td>
+                    {{if or (eq $value.State "PendingFiring") (eq $value.State "PendingResolving")}}<span class="pending">{{ $value.State }}</span>{{end}}
+                    {{if eq $value.State "Firing"}}<span class="firing">{{ $value.State }}</span>{{end}}
+                    {{if eq $value.State "Normal"}}<span class="normal">{{ $value.State }}</span>{{end}}
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</body>
+</html>

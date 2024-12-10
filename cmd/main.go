@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"os"
@@ -39,6 +40,7 @@ import (
 	"prosimcorp.com/SearchRuler/internal/controller"
 	"prosimcorp.com/SearchRuler/internal/globals"
 	"prosimcorp.com/SearchRuler/internal/pools"
+	"prosimcorp.com/SearchRuler/internal/webserver"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -71,6 +73,7 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
+	var webserverAddr string
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -82,6 +85,8 @@ func main() {
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.StringVar(&webserverAddr, "webserver-address", "0",
+		"The address the webserver will bind to. Use :8443 for HTTPS or :8080 for HTTP or leave as 0 to disable the webserver.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -155,6 +160,13 @@ func main() {
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
+	}
+
+	if webserverAddr != "0" {
+		// Create webserver for the application
+		go func() {
+			webserver.RunWebserver(context.TODO(), webserverAddr, RulesPool)
+		}()
 	}
 
 	// Create and store raw Kubernetes clients from client-go

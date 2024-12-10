@@ -69,6 +69,7 @@ They are described in the following table:
 | `--leader-elect`                       | Enable leader election for controller manager                                  |        `false`         |
 | `--metrics-secure`                     | If set the metrics endpoint is served securely                                 |        `false`         |
 | `--enable-http2`                       | If set, HTTP/2 will be enabled for the metrirs                                 |        `false`         |
+| `--webserver-address`                  | Webserver listen address.  </br> 0 disables the webserver                      |          `0`           |
 
 
 ## Examples

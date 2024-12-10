@@ -1,0 +1,115 @@
+body {
+    font-family: 'Roboto', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: linear-gradient(135deg, #e3f2fd, #f9f9f9);
+    color: #333;
+}
+header {
+    background: linear-gradient(90deg, #1e3c72, #2a5298);
+    color: white;
+    padding: 15px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+}
+header img {
+    max-height: 40px;
+    margin-right: 15px;
+    cursor: pointer;
+}
+header h1 {
+    font-family: 'Poppins', Arial, sans-serif;
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0;
+}
+.container {
+    max-width: 900px;
+    margin: 20px auto;
+    background-color: white;
+    box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    padding: 20px;
+}
+table {
+    width: 95%;
+    margin: 30px auto;
+    border-collapse: collapse;
+    box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.1);
+    background-color: white;
+    overflow: hidden;
+    border-radius: 8px;
+}
+th, td {
+    text-align: left;
+    padding: 12px;
+}
+th {
+    background: linear-gradient(90deg, #1e3c72, #2a5298);
+    color: white;
+    font-size: 16px;
+}
+tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+tr:nth-child(odd) {
+    background-color: #ffffff;
+}
+tr:hover {
+    background-color: #e3f2fd;
+}
+.bold {
+    font-weight: bold;
+}
+.pending {
+    color: #ff9800;
+    font-weight: bold;
+}
+.firing {
+    color: #f44336;
+    font-weight: bold;
+}
+.normal {
+    color: #4caf50;
+    font-weight: bold;
+}
+.manifest {
+    background-color: #f8f8f8;
+    padding: 10px;
+    border-radius: 5px;
+    white-space: pre-wrap;
+    overflow-x: auto;
+    font-family: "Courier New", monospace;
+}
+a.back {
+    display: inline-block;
+    margin-top: 20px;
+    color: #1e3c72;
+    text-decoration: none;
+    font-weight: bold;
+}
+a.back:hover {
+    color: #2a5298;
+}
+.btn-details {
+    display: inline-block;
+    padding: 5px 10px;
+    color: white;
+    background-color: #007bff;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 14px;
+}
+.btn-details:hover {
+    background-color: #0056b3;
+}
+@media (max-width: 768px) {
+    table {
+        width: 100%;
+    }
+    th, td {
+        font-size: 14px;
+    }
+}

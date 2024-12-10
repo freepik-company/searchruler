@@ -34,7 +34,7 @@ func (r *QueryConnectorReconciler) Sync(ctx context.Context, eventType watch.Eve
 	// If the eventType is Deleted, remove the credentials from the pool
 	// In other cases get the credentials from the secret and add them to the pool
 	if eventType == watch.Deleted {
-		credentialsKey := fmt.Sprintf("%s/%s", resource.Namespace, resource.Name)
+		credentialsKey := fmt.Sprintf("%s_%s", resource.Namespace, resource.Name)
 		r.CredentialsPool.Delete(credentialsKey)
 		return nil
 	}
@@ -66,7 +66,7 @@ func (r *QueryConnectorReconciler) Sync(ctx context.Context, eventType watch.Eve
 	}
 
 	// Save credentials in the credentials pool
-	key := fmt.Sprintf("%s/%s", resource.Namespace, resource.Name)
+	key := fmt.Sprintf("%s_%s", resource.Namespace, resource.Name)
 	r.CredentialsPool.Set(key, &pools.Credentials{
 		Username: username,
 		Password: password,
