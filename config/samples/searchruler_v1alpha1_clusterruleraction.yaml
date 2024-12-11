@@ -1,9 +1,0 @@
-apiVersion: searchruler.prosimcorp.com/v1alpha1
-kind: ClusterRulerAction
-metadata:
-  labels:
-    app.kubernetes.io/name: search-ruler
-    app.kubernetes.io/managed-by: kustomize
-  name: clusterruleraction-sample
-spec:
-  # TODO(user): Add fields here
