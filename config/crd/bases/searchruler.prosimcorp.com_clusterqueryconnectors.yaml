@@ -4,15 +4,15 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.4
-  name: queryconnectors.searchruler.prosimcorp.com
+  name: clusterqueryconnectors.searchruler.prosimcorp.com
 spec:
   group: searchruler.prosimcorp.com
   names:
-    kind: QueryConnector
-    listKind: QueryConnectorList
-    plural: queryconnectors
-    singular: queryconnector
-  scope: Namespaced
+    kind: ClusterQueryConnector
+    listKind: ClusterQueryConnectorList
+    plural: clusterqueryconnectors
+    singular: clusterqueryconnector
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.conditions[?(@.type=="ResourceSynced")].status
@@ -27,7 +27,8 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: QueryConnector is the Schema for the queryconnectors API.
+        description: ClusterQueryConnector is the Schema for the clusterqueryconnectors
+          API.
         properties:
           apiVersion:
             description: |-

@@ -23,18 +23,50 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-	"prosimcorp.com/SearchRuler/api/v1alpha1"
 	"prosimcorp.com/SearchRuler/internal/pools"
+)
+
+var (
+	resourceNamespace string
+	resourceName      string
+	secretName        string
+	secretNamespace   string
+	secretKeyUsername string
+	secretKeyPassword string
 )
 
 // Sync function is used to synchronize the QueryConnector resource with the credentials. Adds the credentials to the
 // credentials pool to be used in SearchRule resources. Just executed when the resource has a secretRef defined.
-func (r *QueryConnectorReconciler) Sync(ctx context.Context, eventType watch.EventType, resource *v1alpha1.QueryConnector) (err error) {
+func (r *QueryConnectorReconciler) Sync(ctx context.Context, eventType watch.EventType, resource *CompoundQueryConnectorResource, resourceType string) (err error) {
+
+	// Get the resource values depending on the resourceType
+	switch resourceType {
+	case ClusterQueryConnectorResourceType:
+		resourceNamespace = ""
+		resourceName = resource.ClusterQueryConnectorResource.Name
+		secretName = resource.ClusterQueryConnectorResource.Spec.Credentials.SecretRef.Name
+		secretNamespace = resource.ClusterQueryConnectorResource.Spec.Credentials.SecretRef.Namespace
+		if secretNamespace == "" {
+			secretNamespace = "default"
+		}
+		secretKeyUsername = resource.ClusterQueryConnectorResource.Spec.Credentials.SecretRef.KeyUsername
+		secretKeyPassword = resource.ClusterQueryConnectorResource.Spec.Credentials.SecretRef.KeyPassword
+	case QueryConnectorResourceType:
+		resourceNamespace = resource.QueryConnectorResource.Namespace
+		resourceName = resource.QueryConnectorResource.Name
+		secretName = resource.QueryConnectorResource.Spec.Credentials.SecretRef.Name
+		secretNamespace = resource.QueryConnectorResource.Spec.Credentials.SecretRef.Namespace
+		if secretNamespace == "" {
+			secretNamespace = resourceNamespace
+		}
+		secretKeyUsername = resource.QueryConnectorResource.Spec.Credentials.SecretRef.KeyUsername
+		secretKeyPassword = resource.QueryConnectorResource.Spec.Credentials.SecretRef.KeyPassword
+	}
 
 	// If the eventType is Deleted, remove the credentials from the pool
 	// In other cases get the credentials from the secret and add them to the pool
 	if eventType == watch.Deleted {
-		credentialsKey := fmt.Sprintf("%s_%s", resource.Namespace, resource.Name)
+		credentialsKey := fmt.Sprintf("%s_%s", resourceNamespace, resourceName)
 		r.CredentialsPool.Delete(credentialsKey)
 		return nil
 	}
@@ -44,35 +76,35 @@ func (r *QueryConnectorReconciler) Sync(ctx context.Context, eventType watch.Eve
 	// namespace as the QueryConnector resource.
 	QueryConnectorCredsSecret := &v1.Secret{}
 	namespacedName := types.NamespacedName{
-		Namespace: resource.Namespace,
-		Name:      resource.Spec.Credentials.SecretRef.Name,
+		Namespace: secretNamespace,
+		Name:      secretName,
 	}
 	err = r.Get(ctx, namespacedName, QueryConnectorCredsSecret)
 	if err != nil {
 		// Updates status to NoCredsFound
-		r.UpdateConditionNoCredsFound(resource)
+		r.UpdateConditionNoCredsFound(resource, resourceType)
 		return fmt.Errorf(SecretNotFoundErrorMessage, namespacedName, err)
 	}
 
 	// Get username and password from the secret data
-	username := string(QueryConnectorCredsSecret.Data[resource.Spec.Credentials.SecretRef.KeyUsername])
-	password := string(QueryConnectorCredsSecret.Data[resource.Spec.Credentials.SecretRef.KeyPassword])
+	username := string(QueryConnectorCredsSecret.Data[secretKeyUsername])
+	password := string(QueryConnectorCredsSecret.Data[secretKeyPassword])
 
 	// If username or password are empty, return an error
 	if username == "" || password == "" {
 		// Updates status to NoCredsFound
-		r.UpdateConditionNoCredsFound(resource)
+		r.UpdateConditionNoCredsFound(resource, resourceType)
 		return fmt.Errorf(MissingCredentialsMessage, namespacedName)
 	}
 
 	// Save credentials in the credentials pool
-	key := fmt.Sprintf("%s_%s", resource.Namespace, resource.Name)
+	key := fmt.Sprintf("%s_%s", resourceNamespace, resourceName)
 	r.CredentialsPool.Set(key, &pools.Credentials{
 		Username: username,
 		Password: password,
 	})
 
 	// Updates status to Success
-	r.UpdateStateSuccess(resource)
+	r.UpdateStateSuccess(resource, resourceType)
 	return nil
 }

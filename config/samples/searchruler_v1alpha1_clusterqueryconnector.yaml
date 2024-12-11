@@ -1,0 +1,30 @@
+apiVersion: searchruler.prosimcorp.com/v1alpha1
+kind: ClusterQueryConnector
+metadata:
+  labels:
+    app.kubernetes.io/name: search-ruler
+    app.kubernetes.io/managed-by: kustomize
+  name: clusterqueryconnector-sample
+spec:
+
+  # URL for the query connector. We will execute the queries in this URL
+  url: "https://127.0.0.1:9200"
+
+  # Additional headers if needed for the connection
+  headers: {}
+
+  # Skip certificate verification if the connection is HTTPS
+  tlsSkipVerify: true
+
+  # Secret reference to get the credentials if needed for the connection
+  credentials:
+
+    # Interval to check secret credentials for any changes
+    # Default value is 1m
+    #syncInterval: 1m
+
+    secretRef:
+      name: elasticsearch-main-credentials
+      namespace: kube-system
+      keyUsername: username
+      keyPassword: password

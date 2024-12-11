@@ -3,9 +3,10 @@ package controller
 const (
 
 	// Resource types
-	SearchRuleResourceType     = "SearchRule"
-	RulerActionResourceType    = "RulerAction"
-	QueryConnectorResourceType = "QueryConnector"
+	SearchRuleResourceType            = "SearchRule"
+	RulerActionResourceType           = "RulerAction"
+	QueryConnectorResourceType        = "QueryConnector"
+	ClusterQueryConnectorResourceType = "ClusterQueryConnector"
 
 	// Sync interval to check if secrets of SearchRuleAction and SearchRuleQueryConnector are up to date
 	defaultSyncInterval = "1m"

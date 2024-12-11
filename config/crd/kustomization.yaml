@@ -5,6 +5,7 @@ resources:
 - bases/searchruler.prosimcorp.com_ruleractions.yaml
 - bases/searchruler.prosimcorp.com_searchrules.yaml
 - bases/searchruler.prosimcorp.com_queryconnectors.yaml
+- bases/searchruler.prosimcorp.com_clusterqueryconnectors.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:
