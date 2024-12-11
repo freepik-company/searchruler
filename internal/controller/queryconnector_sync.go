@@ -27,14 +27,27 @@ import (
 	"prosimcorp.com/SearchRuler/internal/pools"
 )
 
+const (
+	defaultSecretNamespace = "default"
+)
+
 // Sync function is used to synchronize the QueryConnector resource with the credentials. Adds the credentials to the
 // credentials pool to be used in SearchRule resources. Just executed when the resource has a secretRef defined.
 func (r *QueryConnectorReconciler) Sync(ctx context.Context, eventType watch.EventType, resource *v1alpha1.QueryConnector) (err error) {
 
+	// Get the secret namespace from the QueryConnector or ClusterQueryConnector resource
+	secretNamespace := resource.Namespace
+	if resource.Namespace == "" {
+		secretNamespace = resource.Spec.Credentials.SecretRef.Namespace
+		if resource.Spec.Credentials.SecretRef.Namespace == "" {
+			secretNamespace = defaultSecretNamespace
+		}
+	}
+
 	// If the eventType is Deleted, remove the credentials from the pool
 	// In other cases get the credentials from the secret and add them to the pool
 	if eventType == watch.Deleted {
-		credentialsKey := fmt.Sprintf("%s_%s", resource.Namespace, resource.Name)
+		credentialsKey := fmt.Sprintf("%s_%s", secretNamespace, resource.Name)
 		r.CredentialsPool.Delete(credentialsKey)
 		return nil
 	}
@@ -44,7 +57,7 @@ func (r *QueryConnectorReconciler) Sync(ctx context.Context, eventType watch.Eve
 	// namespace as the QueryConnector resource.
 	QueryConnectorCredsSecret := &v1.Secret{}
 	namespacedName := types.NamespacedName{
-		Namespace: resource.Namespace,
+		Namespace: secretNamespace,
 		Name:      resource.Spec.Credentials.SecretRef.Name,
 	}
 	err = r.Get(ctx, namespacedName, QueryConnectorCredsSecret)
@@ -66,7 +79,7 @@ func (r *QueryConnectorReconciler) Sync(ctx context.Context, eventType watch.Eve
 	}
 
 	// Save credentials in the credentials pool
-	key := fmt.Sprintf("%s_%s", resource.Namespace, resource.Name)
+	key := fmt.Sprintf("%s_%s", secretNamespace, resource.Name)
 	r.CredentialsPool.Set(key, &pools.Credentials{
 		Username: username,
 		Password: password,

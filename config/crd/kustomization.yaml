@@ -5,6 +5,8 @@ resources:
 - bases/searchruler.prosimcorp.com_ruleractions.yaml
 - bases/searchruler.prosimcorp.com_searchrules.yaml
 - bases/searchruler.prosimcorp.com_queryconnectors.yaml
+- bases/searchruler.prosimcorp.com_clusterqueryconnectors.yaml
+- bases/searchruler.prosimcorp.com_clusterruleractions.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:
@@ -17,6 +19,8 @@ patches:
 #- path: patches/cainjection_in_ruleractions.yaml
 #- path: patches/cainjection_in_searchrules.yaml
 #- path: patches/cainjection_in_queryconnectors.yaml
+#- path: patches/cainjection_in_clusterqueryconnectors.yaml
+#- path: patches/cainjection_in_clusterruleractions.yaml
 # +kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # [WEBHOOK] To enable webhook, uncomment the following section

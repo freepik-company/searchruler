@@ -27,6 +27,7 @@ rules:
 - apiGroups:
   - searchruler.prosimcorp.com
   resources:
+  - clusterqueryconnectors
   - queryconnectors
   - ruleractions
   - searchrules
@@ -41,6 +42,7 @@ rules:
 - apiGroups:
   - searchruler.prosimcorp.com
   resources:
+  - clusterqueryconnectors/finalizers
   - queryconnectors/finalizers
   - ruleractions/finalizers
   - searchrules/finalizers
@@ -49,6 +51,7 @@ rules:
 - apiGroups:
   - searchruler.prosimcorp.com
   resources:
+  - clusterqueryconnectors/status
   - queryconnectors/status
   - ruleractions/status
   - searchrules/status

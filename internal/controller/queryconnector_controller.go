@@ -27,6 +27,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -45,6 +46,10 @@ type QueryConnectorReconciler struct {
 // +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=queryconnectors/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=queryconnectors/finalizers,verbs=update
 
+// +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=clusterqueryconnectors,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=clusterqueryconnectors/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=clusterqueryconnectors/finalizers,verbs=update
+
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -56,20 +61,28 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	logger := log.FromContext(ctx)
 
 	// 1. Get the content of the Patch
-	QueryConnectorResource := &searchrulerv1alpha1.QueryConnector{}
+	resourceType := QueryConnectorResourceType
+	QueryConnectorResource := &client.Object{}
 	err = r.Get(ctx, req.NamespacedName, QueryConnectorResource)
+
+	// 1.1 Check if is a ClusterQueryConnector
+	if err != nil && req.Namespace == "" {
+		resourceType = ClusterQueryConnectorResourceType
+		QueryConnectorResource = &searchrulerv1alpha1.ClusterQueryConnector{}
+		err = r.Get(ctx, req.NamespacedName, QueryConnectorResource)
+	}
 
 	// 2. Check existence on the cluster
 	if err != nil {
 
 		// 2.1 It does NOT exist: manage removal
 		if err = client.IgnoreNotFound(err); err == nil {
-			logger.Info(fmt.Sprintf(resourceNotFoundError, QueryConnectorResourceType, req.NamespacedName))
+			logger.Info(fmt.Sprintf(resourceNotFoundError, resourceType, req.NamespacedName))
 			return result, err
 		}
 
 		// 2.2 Failed to get the resource, requeue the request
-		logger.Info(fmt.Sprintf(resourceSyncTimeRetrievalError, QueryConnectorResourceType, req.NamespacedName, err.Error()))
+		logger.Info(fmt.Sprintf(resourceSyncTimeRetrievalError, resourceType, req.NamespacedName, err.Error()))
 		return result, err
 	}
 
@@ -84,7 +97,7 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			controllerutil.RemoveFinalizer(QueryConnectorResource, resourceFinalizer)
 			err = r.Update(ctx, QueryConnectorResource)
 			if err != nil {
-				logger.Info(fmt.Sprintf(resourceFinalizersUpdateError, QueryConnectorResourceType, req.NamespacedName, err.Error()))
+				logger.Info(fmt.Sprintf(resourceFinalizersUpdateError, resourceType, req.NamespacedName, err.Error()))
 			}
 		}
 
@@ -106,7 +119,7 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	defer func() {
 		err = r.Status().Update(ctx, QueryConnectorResource)
 		if err != nil {
-			logger.Info(fmt.Sprintf(resourceConditionUpdateError, QueryConnectorResourceType, req.NamespacedName, err.Error()))
+			logger.Info(fmt.Sprintf(resourceConditionUpdateError, resourceType, req.NamespacedName, err.Error()))
 		}
 	}()
 
@@ -116,7 +129,7 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 	RequeueTime, err := time.ParseDuration(QueryConnectorResource.Spec.Credentials.SyncInterval)
 	if err != nil {
-		logger.Info(fmt.Sprintf(resourceSyncTimeRetrievalError, QueryConnectorResourceType, req.NamespacedName, err.Error()))
+		logger.Info(fmt.Sprintf(resourceSyncTimeRetrievalError, resourceType, req.NamespacedName, err.Error()))
 		return result, err
 	}
 	result = ctrl.Result{
@@ -128,7 +141,7 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		err = r.Sync(ctx, watch.Modified, QueryConnectorResource)
 		if err != nil {
 			r.UpdateConditionKubernetesApiCallFailure(QueryConnectorResource)
-			logger.Info(fmt.Sprintf(syncTargetError, QueryConnectorResourceType, req.NamespacedName, err.Error()))
+			logger.Info(fmt.Sprintf(syncTargetError, resourceType, req.NamespacedName, err.Error()))
 			return result, err
 		}
 	}
@@ -145,5 +158,6 @@ func (r *QueryConnectorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&searchrulerv1alpha1.QueryConnector{}).
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		Named("QueryConnector").
+		Watches(&searchrulerv1alpha1.ClusterQueryConnector{}, &handler.EnqueueRequestForObject{}).
 		Complete(r)
 }

@@ -4,30 +4,21 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.4
-  name: queryconnectors.searchruler.prosimcorp.com
+  name: clusterruleractions.searchruler.prosimcorp.com
 spec:
   group: searchruler.prosimcorp.com
   names:
-    kind: QueryConnector
-    listKind: QueryConnectorList
-    plural: queryconnectors
-    singular: queryconnector
-  scope: Namespaced
+    kind: ClusterRulerAction
+    listKind: ClusterRulerActionList
+    plural: clusterruleractions
+    singular: clusterruleraction
+  scope: Cluster
   versions:
-  - additionalPrinterColumns:
-    - jsonPath: .status.conditions[?(@.type=="ResourceSynced")].status
-      name: Ready
-      type: string
-    - jsonPath: .status.conditions[?(@.type=="State")].reason
-      name: Status
-      type: string
-    - jsonPath: .metadata.creationTimestamp
-      name: Age
-      type: date
-    name: v1alpha1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: QueryConnector is the Schema for the queryconnectors API.
+        description: ClusterRulerAction is the Schema for the clusterruleractions
+          API.
         properties:
           apiVersion:
             description: |-
@@ -47,45 +38,54 @@ spec:
           metadata:
             type: object
           spec:
-            description: QueryConnectorSpec defines the desired state of QueryConnector.
+            description: ClusterRulerActionSpec defines the desired state of ClusterRulerAction.
             properties:
-              credentials:
-                description: QueryConnectorCredentials TODO
+              webhook:
+                description: WebHook TODO
                 properties:
-                  secretRef:
-                    description: SecretRef TODO
+                  credentials:
+                    description: RulerActionCredentials TODO
                     properties:
-                      keyPassword:
-                        type: string
-                      keyUsername:
-                        type: string
-                      name:
-                        type: string
-                      namespace:
-                        type: string
+                      secretRef:
+                        description: SecretRef TODO
+                        properties:
+                          keyPassword:
+                            type: string
+                          keyUsername:
+                            type: string
+                          name:
+                            type: string
+                          namespace:
+                            type: string
+                        required:
+                        - keyPassword
+                        - keyUsername
+                        - name
+                        type: object
                     required:
-                    - keyPassword
-                    - keyUsername
-                    - name
+                    - secretRef
                     type: object
-                  syncInterval:
+                  headers:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  tlsSkipVerify:
+                    type: boolean
+                  url:
+                    type: string
+                  validator:
+                    type: string
+                  verb:
                     type: string
                 required:
-                - secretRef
+                - url
+                - verb
                 type: object
-              headers:
-                additionalProperties:
-                  type: string
-                type: object
-              tlsSkipVerify:
-                type: boolean
-              url:
-                type: string
             required:
-            - url
+            - webhook
             type: object
           status:
-            description: QueryConnectorStatus defines the observed state of QueryConnector.
+            description: ClusterRulerActionStatus defines the observed state of ClusterRulerAction.
             properties:
               conditions:
                 items:
