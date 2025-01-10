@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package queryconnector
 
 import (
 	"context"
@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"time"
 
+	//
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -32,7 +33,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	//
 	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
+	"prosimcorp.com/SearchRuler/internal/controller"
 	"prosimcorp.com/SearchRuler/internal/pools"
 )
 
@@ -74,10 +77,10 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 	switch req.Namespace {
 	case "":
-		resourceType = ClusterQueryConnectorResourceType
+		resourceType = controller.ClusterQueryConnectorResourceType
 		err = r.Get(ctx, req.NamespacedName, CompoundQueryConnectorResource.ClusterQueryConnectorResource)
 	default:
-		resourceType = QueryConnectorResourceType
+		resourceType = controller.QueryConnectorResourceType
 		err = r.Get(ctx, req.NamespacedName, CompoundQueryConnectorResource.QueryConnectorResource)
 	}
 
@@ -86,24 +89,24 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 		// 2.1 It does NOT exist: manage removal
 		if err = client.IgnoreNotFound(err); err == nil {
-			logger.Info(fmt.Sprintf(resourceNotFoundError, resourceType, req.NamespacedName))
+			logger.Info(fmt.Sprintf(controller.ResourceNotFoundError, resourceType, req.NamespacedName))
 			return result, err
 		}
 
 		// 2.2 Failed to get the resource, requeue the request
-		logger.Info(fmt.Sprintf(resourceSyncTimeRetrievalError, resourceType, req.NamespacedName, err.Error()))
+		logger.Info(fmt.Sprintf(controller.ResourceSyncTimeRetrievalError, resourceType, req.NamespacedName, err.Error()))
 		return result, err
 	}
 
 	// 3. Check if the SearchRule instance is marked to be deleted: indicated by the deletion timestamp being set
 	deletionTimestamp := &v1.Time{}
 	switch resourceType {
-	case ClusterQueryConnectorResourceType:
+	case controller.ClusterQueryConnectorResourceType:
 		deletionTimestamp = CompoundQueryConnectorResource.ClusterQueryConnectorResource.DeletionTimestamp
-		containsFinalizer = controllerutil.ContainsFinalizer(CompoundQueryConnectorResource.ClusterQueryConnectorResource, resourceFinalizer)
+		containsFinalizer = controllerutil.ContainsFinalizer(CompoundQueryConnectorResource.ClusterQueryConnectorResource, controller.ResourceFinalizer)
 	default:
 		deletionTimestamp = CompoundQueryConnectorResource.QueryConnectorResource.DeletionTimestamp
-		containsFinalizer = controllerutil.ContainsFinalizer(CompoundQueryConnectorResource.QueryConnectorResource, resourceFinalizer)
+		containsFinalizer = controllerutil.ContainsFinalizer(CompoundQueryConnectorResource.QueryConnectorResource, controller.ResourceFinalizer)
 	}
 	if !deletionTimestamp.IsZero() {
 		if containsFinalizer {
@@ -113,15 +116,15 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 			// Remove the finalizers on Patch CR
 			switch resourceType {
-			case ClusterQueryConnectorResourceType:
-				controllerutil.RemoveFinalizer(CompoundQueryConnectorResource.ClusterQueryConnectorResource, resourceFinalizer)
+			case controller.ClusterQueryConnectorResourceType:
+				controllerutil.RemoveFinalizer(CompoundQueryConnectorResource.ClusterQueryConnectorResource, controller.ResourceFinalizer)
 				err = r.Update(ctx, CompoundQueryConnectorResource.ClusterQueryConnectorResource)
 			default:
-				controllerutil.RemoveFinalizer(CompoundQueryConnectorResource.QueryConnectorResource, resourceFinalizer)
+				controllerutil.RemoveFinalizer(CompoundQueryConnectorResource.QueryConnectorResource, controller.ResourceFinalizer)
 				err = r.Update(ctx, CompoundQueryConnectorResource.QueryConnectorResource)
 			}
 			if err != nil {
-				logger.Info(fmt.Sprintf(resourceFinalizersUpdateError, resourceType, req.NamespacedName, err.Error()))
+				logger.Info(fmt.Sprintf(controller.ResourceFinalizersUpdateError, resourceType, req.NamespacedName, err.Error()))
 			}
 		}
 
@@ -133,11 +136,11 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// 4. Add finalizer to the SearchRule CR
 	if !containsFinalizer {
 		switch resourceType {
-		case ClusterQueryConnectorResourceType:
-			controllerutil.AddFinalizer(CompoundQueryConnectorResource.ClusterQueryConnectorResource, resourceFinalizer)
+		case controller.ClusterQueryConnectorResourceType:
+			controllerutil.AddFinalizer(CompoundQueryConnectorResource.ClusterQueryConnectorResource, controller.ResourceFinalizer)
 			err = r.Update(ctx, CompoundQueryConnectorResource.ClusterQueryConnectorResource)
 		default:
-			controllerutil.AddFinalizer(CompoundQueryConnectorResource.QueryConnectorResource, resourceFinalizer)
+			controllerutil.AddFinalizer(CompoundQueryConnectorResource.QueryConnectorResource, controller.ResourceFinalizer)
 			err = r.Update(ctx, CompoundQueryConnectorResource.QueryConnectorResource)
 		}
 		if err != nil {
@@ -148,20 +151,20 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// 5. Update the status before the requeue
 	defer func() {
 		switch resourceType {
-		case ClusterQueryConnectorResourceType:
+		case controller.ClusterQueryConnectorResourceType:
 			err = r.Status().Update(ctx, CompoundQueryConnectorResource.ClusterQueryConnectorResource)
 		default:
 			err = r.Status().Update(ctx, CompoundQueryConnectorResource.QueryConnectorResource)
 		}
 		if err != nil {
-			logger.Info(fmt.Sprintf(resourceConditionUpdateError, resourceType, req.NamespacedName, err.Error()))
+			logger.Info(fmt.Sprintf(controller.ResourceConditionUpdateError, resourceType, req.NamespacedName, err.Error()))
 		}
 	}()
 
 	// 6. Schedule periodical request
-	syncInterval := defaultSyncInterval
+	syncInterval := controller.DefaultSyncInterval
 	switch resourceType {
-	case ClusterQueryConnectorResourceType:
+	case controller.ClusterQueryConnectorResourceType:
 		if !reflect.ValueOf(CompoundQueryConnectorResource.ClusterQueryConnectorResource.Spec.Credentials.SyncInterval).IsZero() {
 			syncInterval = CompoundQueryConnectorResource.ClusterQueryConnectorResource.Spec.Credentials.SyncInterval
 		}
@@ -173,7 +176,7 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	RequeueTime, err := time.ParseDuration(syncInterval)
 	if err != nil {
-		logger.Info(fmt.Sprintf(resourceSyncTimeRetrievalError, resourceType, req.NamespacedName, err.Error()))
+		logger.Info(fmt.Sprintf(controller.ResourceSyncTimeRetrievalError, resourceType, req.NamespacedName, err.Error()))
 		return result, err
 	}
 	result = ctrl.Result{
@@ -182,7 +185,7 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// 7. Sync credentials if defined
 	credentials := CompoundQueryConnectorResource.QueryConnectorResource.Spec.Credentials
-	if resourceType == ClusterQueryConnectorResourceType {
+	if resourceType == controller.ClusterQueryConnectorResourceType {
 		credentials = CompoundQueryConnectorResource.ClusterQueryConnectorResource.Spec.Credentials
 	}
 
@@ -190,7 +193,7 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		err = r.Sync(ctx, watch.Modified, CompoundQueryConnectorResource, resourceType)
 		if err != nil {
 			r.UpdateConditionKubernetesApiCallFailure(CompoundQueryConnectorResource, resourceType)
-			logger.Info(fmt.Sprintf(syncTargetError, resourceType, req.NamespacedName, err.Error()))
+			logger.Info(fmt.Sprintf(controller.SyncTargetError, resourceType, req.NamespacedName, err.Error()))
 			return result, err
 		}
 	}

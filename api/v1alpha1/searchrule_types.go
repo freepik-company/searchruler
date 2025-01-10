@@ -46,7 +46,8 @@ type ActionRef struct {
 
 // QueryConnectorRef TODO
 type QueryConnectorRef struct {
-	Name string `json:"name"`
+	Name      string `json:"name"`
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // SearchRuleSpec defines the desired state of SearchRule.

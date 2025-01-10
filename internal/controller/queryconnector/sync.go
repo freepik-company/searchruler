@@ -14,15 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package queryconnector
 
 import (
 	"context"
 	"fmt"
 
+	//
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+
+	//
+	"prosimcorp.com/SearchRuler/internal/controller"
 	"prosimcorp.com/SearchRuler/internal/pools"
 )
 
@@ -41,7 +45,7 @@ func (r *QueryConnectorReconciler) Sync(ctx context.Context, eventType watch.Eve
 
 	// Get the resource values depending on the resourceType
 	switch resourceType {
-	case ClusterQueryConnectorResourceType:
+	case controller.ClusterQueryConnectorResourceType:
 		resourceNamespace = ""
 		resourceName = resource.ClusterQueryConnectorResource.Name
 		secretName = resource.ClusterQueryConnectorResource.Spec.Credentials.SecretRef.Name
@@ -51,7 +55,7 @@ func (r *QueryConnectorReconciler) Sync(ctx context.Context, eventType watch.Eve
 		}
 		secretKeyUsername = resource.ClusterQueryConnectorResource.Spec.Credentials.SecretRef.KeyUsername
 		secretKeyPassword = resource.ClusterQueryConnectorResource.Spec.Credentials.SecretRef.KeyPassword
-	case QueryConnectorResourceType:
+	case controller.QueryConnectorResourceType:
 		resourceNamespace = resource.QueryConnectorResource.Namespace
 		resourceName = resource.QueryConnectorResource.Name
 		secretName = resource.QueryConnectorResource.Spec.Credentials.SecretRef.Name
@@ -83,7 +87,7 @@ func (r *QueryConnectorReconciler) Sync(ctx context.Context, eventType watch.Eve
 	if err != nil {
 		// Updates status to NoCredsFound
 		r.UpdateConditionNoCredsFound(resource, resourceType)
-		return fmt.Errorf(SecretNotFoundErrorMessage, namespacedName, err)
+		return fmt.Errorf(controller.SecretNotFoundErrorMessage, namespacedName, err)
 	}
 
 	// Get username and password from the secret data
@@ -94,7 +98,7 @@ func (r *QueryConnectorReconciler) Sync(ctx context.Context, eventType watch.Eve
 	if username == "" || password == "" {
 		// Updates status to NoCredsFound
 		r.UpdateConditionNoCredsFound(resource, resourceType)
-		return fmt.Errorf(MissingCredentialsMessage, namespacedName)
+		return fmt.Errorf(controller.MissingCredentialsMessage, namespacedName)
 	}
 
 	// Save credentials in the credentials pool

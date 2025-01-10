@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package searchrule
 
 import (
 	"context"
 	"fmt"
 	"time"
 
+	//
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -29,7 +30,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	//
 	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
+	"prosimcorp.com/SearchRuler/internal/controller"
 	"prosimcorp.com/SearchRuler/internal/pools"
 )
 
@@ -65,27 +68,27 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 		// 2.1 It does NOT exist: manage removal
 		if err = client.IgnoreNotFound(err); err == nil {
-			logger.Info(fmt.Sprintf(resourceNotFoundError, SearchRuleResourceType, req.NamespacedName))
+			logger.Info(fmt.Sprintf(controller.ResourceNotFoundError, controller.SearchRuleResourceType, req.NamespacedName))
 			return result, err
 		}
 
 		// 2.2 Failed to get the resource, requeue the request
-		logger.Info(fmt.Sprintf(resourceSyncTimeRetrievalError, SearchRuleResourceType, req.NamespacedName, err.Error()))
+		logger.Info(fmt.Sprintf(controller.ResourceSyncTimeRetrievalError, controller.SearchRuleResourceType, req.NamespacedName, err.Error()))
 		return result, err
 	}
 
 	// 3. Check if the SearchRule instance is marked to be deleted: indicated by the deletion timestamp being set
 	if !searchRuleResource.DeletionTimestamp.IsZero() {
-		if controllerutil.ContainsFinalizer(searchRuleResource, resourceFinalizer) {
+		if controllerutil.ContainsFinalizer(searchRuleResource, controller.ResourceFinalizer) {
 
 			// 3.1 Delete the resources associated with the SearchRule
 			err = r.Sync(ctx, watch.Deleted, searchRuleResource)
 
 			// Remove the finalizers on Patch CR
-			controllerutil.RemoveFinalizer(searchRuleResource, resourceFinalizer)
+			controllerutil.RemoveFinalizer(searchRuleResource, controller.ResourceFinalizer)
 			err = r.Update(ctx, searchRuleResource)
 			if err != nil {
-				logger.Info(fmt.Sprintf(resourceFinalizersUpdateError, SearchRuleResourceType, req.NamespacedName, err.Error()))
+				logger.Info(fmt.Sprintf(controller.ResourceFinalizersUpdateError, controller.SearchRuleResourceType, req.NamespacedName, err.Error()))
 			}
 		}
 
@@ -95,8 +98,8 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// 4. Add finalizer to the SearchRule CR
-	if !controllerutil.ContainsFinalizer(searchRuleResource, resourceFinalizer) {
-		controllerutil.AddFinalizer(searchRuleResource, resourceFinalizer)
+	if !controllerutil.ContainsFinalizer(searchRuleResource, controller.ResourceFinalizer) {
+		controllerutil.AddFinalizer(searchRuleResource, controller.ResourceFinalizer)
 		err = r.Update(ctx, searchRuleResource)
 		if err != nil {
 			return result, err
@@ -107,14 +110,14 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	defer func() {
 		err = r.Status().Update(ctx, searchRuleResource)
 		if err != nil {
-			logger.Info(fmt.Sprintf(resourceConditionUpdateError, SearchRuleResourceType, req.NamespacedName, err.Error()))
+			logger.Info(fmt.Sprintf(controller.ResourceConditionUpdateError, controller.SearchRuleResourceType, req.NamespacedName, err.Error()))
 		}
 	}()
 
 	// 6. Schedule periodical request
 	RequeueTime, err := time.ParseDuration(searchRuleResource.Spec.CheckInterval)
 	if err != nil {
-		logger.Info(fmt.Sprintf(resourceSyncTimeRetrievalError, SearchRuleResourceType, req.NamespacedName, err.Error()))
+		logger.Info(fmt.Sprintf(controller.ResourceSyncTimeRetrievalError, controller.SearchRuleResourceType, req.NamespacedName, err.Error()))
 		return result, err
 	}
 	result = ctrl.Result{
@@ -125,7 +128,7 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	err = r.Sync(ctx, watch.Modified, searchRuleResource)
 	if err != nil {
 		r.UpdateConditionKubernetesApiCallFailure(searchRuleResource)
-		logger.Info(fmt.Sprintf(syncTargetError, SearchRuleResourceType, req.NamespacedName, err.Error()))
+		logger.Info(fmt.Sprintf(controller.SyncTargetError, controller.SearchRuleResourceType, req.NamespacedName, err.Error()))
 		return result, err
 	}
 

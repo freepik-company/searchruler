@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package searchrule
 
 import (
-	"prosimcorp.com/SearchRuler/internal/globals"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
+
+	//
+	"prosimcorp.com/SearchRuler/api/v1alpha1"
+	"prosimcorp.com/SearchRuler/internal/globals"
 )
 
 // UpdateConditionSuccess updates the status of the SearchRule resource with a success condition

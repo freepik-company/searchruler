@@ -14,12 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package queryconnector
 
 import (
-	"prosimcorp.com/SearchRuler/internal/globals"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	//
+	"prosimcorp.com/SearchRuler/internal/controller"
+	"prosimcorp.com/SearchRuler/internal/globals"
 )
 
 // UpdateConditionSuccess updates the status of the resource with a success condition
@@ -31,7 +33,7 @@ func (r *QueryConnectorReconciler) UpdateConditionSuccess(resource *CompoundQuer
 
 	// Update the status of the QueryConnector resource
 	switch resourceType {
-	case ClusterQueryConnectorResourceType:
+	case controller.ClusterQueryConnectorResourceType:
 		globals.UpdateCondition(&resource.ClusterQueryConnectorResource.Status.Conditions, condition)
 	default:
 		globals.UpdateCondition(&resource.QueryConnectorResource.Status.Conditions, condition)
@@ -47,7 +49,7 @@ func (r *QueryConnectorReconciler) UpdateConditionKubernetesApiCallFailure(resou
 
 	// Update the status of the QueryConnector resource
 	switch resourceType {
-	case ClusterQueryConnectorResourceType:
+	case controller.ClusterQueryConnectorResourceType:
 		globals.UpdateCondition(&resource.ClusterQueryConnectorResource.Status.Conditions, condition)
 	default:
 		globals.UpdateCondition(&resource.QueryConnectorResource.Status.Conditions, condition)
@@ -63,7 +65,7 @@ func (r *QueryConnectorReconciler) UpdateStateSuccess(resource *CompoundQueryCon
 
 	// Update the status of the QueryConnector resource
 	switch resourceType {
-	case ClusterQueryConnectorResourceType:
+	case controller.ClusterQueryConnectorResourceType:
 		globals.UpdateCondition(&resource.ClusterQueryConnectorResource.Status.Conditions, condition)
 	default:
 		globals.UpdateCondition(&resource.QueryConnectorResource.Status.Conditions, condition)
@@ -79,7 +81,7 @@ func (r *QueryConnectorReconciler) UpdateConditionNoCredsFound(resource *Compoun
 
 	// Update the status of the QueryConnector resource
 	switch resourceType {
-	case ClusterQueryConnectorResourceType:
+	case controller.ClusterQueryConnectorResourceType:
 		globals.UpdateCondition(&resource.ClusterQueryConnectorResource.Status.Conditions, condition)
 	default:
 		globals.UpdateCondition(&resource.QueryConnectorResource.Status.Conditions, condition)

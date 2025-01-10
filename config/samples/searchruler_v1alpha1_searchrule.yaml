@@ -14,6 +14,7 @@ spec:
   # QueryConnector reference to execute the queries for the rule evaluation.
   queryConnectorRef:
     name: queryconnector-sample
+    namespace: default
 
   # Interval time for checking the value of the query. For example, every 30s we will
   # execute the query value to elasticsearch

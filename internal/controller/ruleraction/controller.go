@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package ruleraction
 
 import (
 	"context"
@@ -22,9 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
-	"prosimcorp.com/SearchRuler/internal/globals"
-	"prosimcorp.com/SearchRuler/internal/pools"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,6 +30,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	//
+	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
+	"prosimcorp.com/SearchRuler/internal/controller"
+	"prosimcorp.com/SearchRuler/internal/globals"
+	"prosimcorp.com/SearchRuler/internal/pools"
 )
 
 // RulerActionReconciler reconciles a RulerAction object
@@ -75,23 +79,23 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 		// 2.1 It does NOT exist: manage removal
 		if err = client.IgnoreNotFound(err); err == nil {
-			logger.Info(fmt.Sprintf(resourceNotFoundError, RulerActionResourceType, req.NamespacedName))
+			logger.Info(fmt.Sprintf(controller.ResourceNotFoundError, controller.RulerActionResourceType, req.NamespacedName))
 			return result, err
 		}
 
 		// 2.2 Failed to get the resource, requeue the request
-		logger.Info(fmt.Sprintf(resourceSyncTimeRetrievalError, RulerActionResourceType, req.NamespacedName, err.Error()))
+		logger.Info(fmt.Sprintf(controller.ResourceSyncTimeRetrievalError, controller.RulerActionResourceType, req.NamespacedName, err.Error()))
 		return result, err
 	}
 
 	// 3. Check if the SearchRule instance is marked to be deleted: indicated by the deletion timestamp being set
 	if !RulerActionResource.DeletionTimestamp.IsZero() {
-		if controllerutil.ContainsFinalizer(RulerActionResource, resourceFinalizer) {
+		if controllerutil.ContainsFinalizer(RulerActionResource, controller.ResourceFinalizer) {
 			// Remove the finalizers on Patch CR
-			controllerutil.RemoveFinalizer(RulerActionResource, resourceFinalizer)
+			controllerutil.RemoveFinalizer(RulerActionResource, controller.ResourceFinalizer)
 			err = r.Update(ctx, RulerActionResource)
 			if err != nil {
-				logger.Info(fmt.Sprintf(resourceFinalizersUpdateError, RulerActionResourceType, req.NamespacedName, err.Error()))
+				logger.Info(fmt.Sprintf(controller.ResourceFinalizersUpdateError, controller.RulerActionResourceType, req.NamespacedName, err.Error()))
 			}
 		}
 
@@ -101,8 +105,8 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// 4. Add finalizer to the SearchRule CR
-	if !controllerutil.ContainsFinalizer(RulerActionResource, resourceFinalizer) {
-		controllerutil.AddFinalizer(RulerActionResource, resourceFinalizer)
+	if !controllerutil.ContainsFinalizer(RulerActionResource, controller.ResourceFinalizer) {
+		controllerutil.AddFinalizer(RulerActionResource, controller.ResourceFinalizer)
 		err = r.Update(ctx, RulerActionResource)
 		if err != nil {
 			return result, err
@@ -113,7 +117,7 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	defer func() {
 		err = r.Status().Update(ctx, RulerActionResource)
 		if err != nil {
-			logger.Info(fmt.Sprintf(resourceConditionUpdateError, RulerActionResourceType, req.NamespacedName, err.Error()))
+			logger.Info(fmt.Sprintf(controller.ResourceConditionUpdateError, controller.RulerActionResourceType, req.NamespacedName, err.Error()))
 		}
 
 	}()
@@ -135,7 +139,7 @@ processEvent:
 	err = r.Sync(ctx, RulerActionResource)
 	if err != nil {
 		r.UpdateConditionKubernetesApiCallFailure(RulerActionResource)
-		logger.Info(fmt.Sprintf(syncTargetError, RulerActionResourceType, req.NamespacedName, err.Error()))
+		logger.Info(fmt.Sprintf(controller.SyncTargetError, controller.RulerActionResourceType, req.NamespacedName, err.Error()))
 		return result, err
 	}
 
@@ -154,6 +158,7 @@ func (r *RulerActionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&searchrulerv1alpha1.RulerAction{}).
 		Named("RulerAction").
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
+		Watches(&searchrulerv1alpha1.ClusterRulerAction{}, &handler.EnqueueRequestForObject{}).
 		Watches(&corev1.Event{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(prefixFilter)). // Also watch for events, so SearchRule controller throws events when a rule is firing
 		Complete(r)
 }

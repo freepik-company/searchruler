@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package ruleraction
 
 import (
 	"bytes"
@@ -27,11 +27,14 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	//
 	"prosimcorp.com/SearchRuler/api/v1alpha1"
+	"prosimcorp.com/SearchRuler/internal/controller"
 	"prosimcorp.com/SearchRuler/internal/pools"
 	"prosimcorp.com/SearchRuler/internal/template"
 	"prosimcorp.com/SearchRuler/internal/validators"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
@@ -60,7 +63,7 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 		err = r.Get(ctx, namespacedName, RulerActionCredsSecret)
 		if err != nil {
 			r.UpdateConditionNoCredsFound(resource)
-			return fmt.Errorf(SecretNotFoundErrorMessage, namespacedName, err)
+			return fmt.Errorf(controller.SecretNotFoundErrorMessage, namespacedName, err)
 		}
 
 		// Get username and password
@@ -68,7 +71,7 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 		password = string(RulerActionCredsSecret.Data[resource.Spec.Webhook.Credentials.SecretRef.KeyPassword])
 		if username == "" || password == "" {
 			r.UpdateConditionNoCredsFound(resource)
-			return fmt.Errorf(MissingCredentialsMessage, namespacedName)
+			return fmt.Errorf(controller.MissingCredentialsMessage, namespacedName)
 		}
 	}
 
@@ -76,7 +79,7 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 	// Alerts key pattern: namespace/rulerActionName/searchRuleName
 	alerts, err := r.getRulerActionAssociatedAlerts(resource)
 	if err != nil {
-		return fmt.Errorf(AlertsPoolErrorMessage, err)
+		return fmt.Errorf(controller.AlertsPoolErrorMessage, err)
 	}
 
 	// If there are alerts for the rulerAction, initialice the HTTP client
@@ -93,7 +96,7 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 		// Create the request with the configured verb and URL
 		httpRequest, err := http.NewRequest(resource.Spec.Webhook.Verb, resource.Spec.Webhook.Url, nil)
 		if err != nil {
-			return fmt.Errorf(HttpRequestCreationErrorMessage, err)
+			return fmt.Errorf(controller.HttpRequestCreationErrorMessage, err)
 		}
 
 		// Add headers to the request if set
@@ -113,7 +116,7 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 
 			// Log alert firing
 			logger.Info(fmt.Sprintf(
-				AlertFiringInfoMessage,
+				controller.AlertFiringInfoMessage,
 				alert.SearchRule.Namespace,
 				alert.SearchRule.Name,
 				alert.SearchRule.Spec.Description,
@@ -131,7 +134,7 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 			parsedMessage, err := template.EvaluateTemplate(alert.SearchRule.Spec.ActionRef.Data, templateInjectedObject)
 			if err != nil {
 				r.UpdateConditionEvaluateTemplateError(resource)
-				return fmt.Errorf(EvaluateTemplateErrorMessage, err)
+				return fmt.Errorf(controller.EvaluateTemplateErrorMessage, err)
 			}
 
 			// Check if the webhook has a validator and execute it when available
@@ -141,20 +144,20 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 				_, validatorFound := validatorsMap[resource.Spec.Webhook.Validator]
 				if !validatorFound {
 					r.UpdateConditionEvaluateTemplateError(resource)
-					return fmt.Errorf(ValidatorNotFoundErrorMessage, resource.Spec.Webhook.Validator)
+					return fmt.Errorf(controller.ValidatorNotFoundErrorMessage, resource.Spec.Webhook.Validator)
 				}
 
 				// Execute the validator to the data of the alert
 				validatorResult, validatorHint, err := validatorsMap[resource.Spec.Webhook.Validator](parsedMessage)
 				if err != nil {
 					r.UpdateConditionEvaluateTemplateError(resource)
-					return fmt.Errorf(ValidationFailedErrorMessage, err.Error())
+					return fmt.Errorf(controller.ValidationFailedErrorMessage, err.Error())
 				}
 
 				// Check the result of the validator
 				if !validatorResult {
 					r.UpdateConditionEvaluateTemplateError(resource)
-					return fmt.Errorf(ValidationFailedErrorMessage, validatorHint)
+					return fmt.Errorf(controller.ValidationFailedErrorMessage, validatorHint)
 				}
 			}
 
@@ -166,7 +169,7 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 			httpResponse, err := httpClient.Do(httpRequest)
 			if err != nil {
 				r.UpdateConditionConnectionError(resource)
-				return fmt.Errorf(HttpRequestSendingErrorMessage, err)
+				return fmt.Errorf(controller.HttpRequestSendingErrorMessage, err)
 			}
 
 			defer httpResponse.Body.Close()
