@@ -25,6 +25,6 @@ spec:
 
     secretRef:
       name: elasticsearch-main-credentials
-      namespace: kube-system
+      namespace: default
       keyUsername: username
       keyPassword: password

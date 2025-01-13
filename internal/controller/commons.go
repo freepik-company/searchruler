@@ -7,6 +7,7 @@ const (
 	RulerActionResourceType           = "RulerAction"
 	QueryConnectorResourceType        = "QueryConnector"
 	ClusterQueryConnectorResourceType = "ClusterQueryConnector"
+	ClusterRulerActionResourceType    = "ClusterRulerAction"
 
 	// Sync interval to check if secrets of SearchRuleAction and SearchRuleQueryConnector are up to date
 	DefaultSyncInterval = "1m"
