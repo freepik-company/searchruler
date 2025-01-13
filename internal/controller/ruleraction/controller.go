@@ -81,12 +81,13 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// 1.1 Try with Event resource first. If it is not an Event, then it will return an error
 	// but reconcile will try if it is a RulerAction resource relationated with an Event
-	*CompoundRulerActionResource, err = r.GetEventRuleAction(ctx, req.Namespace, req.Name, resourceType)
+	tempCompoundRulerActionResource, err := r.GetEventRuleAction(ctx, req.Namespace, req.Name, resourceType)
 	if err == nil {
+		*CompoundRulerActionResource = tempCompoundRulerActionResource
 		goto processEvent
 	}
 
-	// 1.2 Try with RulerAction resource
+	// 1.2 Try with RulerAction or ClusterRulerAction resource
 	switch req.Namespace {
 	case "":
 		resourceType = controller.ClusterRulerActionResourceType
@@ -106,11 +107,11 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 
 		// 2.2 Failed to get the resource, requeue the request
-		logger.Info(fmt.Sprintf(controller.ResourceSyncTimeRetrievalError, controller.RulerActionResourceType, req.NamespacedName, err.Error()))
+		logger.Info(fmt.Sprintf(controller.CanNotGetResourceError, controller.RulerActionResourceType, req.NamespacedName, err.Error()))
 		return result, err
 	}
 
-	// 3. Check if the SearchRule instance is marked to be deleted: indicated by the deletion timestamp being set
+	// 3. Check if the RulerAction instance is marked to be deleted: indicated by the deletion timestamp being set
 	switch resourceType {
 	case controller.ClusterRulerActionResourceType:
 		deletionTimestamp = CompoundRulerActionResource.ClusterRulerActionResource.DeletionTimestamp
@@ -141,7 +142,7 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return result, err
 	}
 
-	// 4. Add finalizer to the SearchRule CR
+	// 4. Add finalizer to the RulerAction CR
 	if !containsFinalizer {
 		switch resourceType {
 		case controller.ClusterRulerActionResourceType:

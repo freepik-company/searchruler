@@ -96,7 +96,7 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *CompoundRule
 		return fmt.Errorf(controller.AlertsPoolErrorMessage, err)
 	}
 
-	// If there are alerts for the rulerAction, initialice the HTTP client
+	// If there are alerts for the rulerAction, initialize the HTTP client
 	if len(alerts) > 0 {
 		// Create the HTTP client
 		httpClient := &http.Client{

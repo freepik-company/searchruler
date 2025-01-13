@@ -90,27 +90,27 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 		return nil
 	}
 
-	// Get QueryConnector associated to the rule
+	// Get QueryConnector associated to the rule with KubeRawClient
 	gvr := schema.GroupVersionResource{
 		Group:    v1alpha1.GroupVersion.Group,
 		Version:  v1alpha1.GroupVersion.Version,
 		Resource: "clusterqueryconnectors",
 	}
 
-	recursitoWrapper := globals.Application.KubeRawClient.Resource(gvr)
+	queryConnectorWrapper := globals.Application.KubeRawClient.Resource(gvr)
 	if resource.Spec.QueryConnectorRef.Namespace != "" {
 		gvr.Resource = "queryconnectors"
-		recursitoWrapper = globals.Application.KubeRawClient.Resource(gvr)
-		recursitoWrapper.Namespace(resource.Spec.QueryConnectorRef.Namespace)
+		queryConnectorWrapper = globals.Application.KubeRawClient.Resource(gvr)
+		queryConnectorWrapper.Namespace(resource.Spec.QueryConnectorRef.Namespace)
 	}
 
-	QueryConnectorResource, err := recursitoWrapper.Get(ctx, resource.Spec.QueryConnectorRef.Name, metav1.GetOptions{})
+	QueryConnectorResource, err := queryConnectorWrapper.Get(ctx, resource.Spec.QueryConnectorRef.Name, metav1.GetOptions{})
 	if err != nil {
 		// TODO: Improve this
 		return err
 	}
 
-	//
+	// If QueryConnector is empty then error
 	if reflect.ValueOf(QueryConnectorResource).IsZero() {
 		r.UpdateConditionQueryConnectorNotFound(resource)
 		return fmt.Errorf(
@@ -120,17 +120,16 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 		)
 	}
 
+	// Tricky for save queryConnector resource with QueryConnectorSpec type
 	QueryConnectorSpec := &v1alpha1.QueryConnectorSpec{}
-
 	QueryConnectorSpecI := QueryConnectorResource.Object["spec"]
 	specBytes, err := json.Marshal(QueryConnectorSpecI)
 	if err != nil {
-		// TODO: Improve this
+		return fmt.Errorf(controller.JSONMarshalErrorMessage, err)
 	}
-
 	err = json.Unmarshal(specBytes, QueryConnectorSpec)
 	if err != nil {
-		// TODO: Improve this
+		return fmt.Errorf(controller.JSONMarshalErrorMessage, err)
 	}
 
 	// Get credentials for QueryConnector attached if defined

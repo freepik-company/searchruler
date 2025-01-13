@@ -14,8 +14,7 @@ const (
 
 	// Error messages
 	ResourceNotFoundError                  = "%s '%s' resource not found. Ignoring since object must be deleted."
-	ResourceRetrievalError                 = "Error getting the %s '%s' from the cluster: %s"
-	ResourceTargetsDeleteError             = "Failed to delete targets of %s '%s': %s"
+	CanNotGetResourceError                 = "%s '%s' resource not found. Error: %v"
 	ResourceFinalizersUpdateError          = "Failed to update finalizer of %s '%s': %s"
 	ResourceConditionUpdateError           = "Failed to update the condition on %s '%s': %s"
 	ResourceSyncTimeRetrievalError         = "can not get synchronization time from the %s '%s': %s"
@@ -27,7 +26,6 @@ const (
 	AlertFiringInfoMessage                 = "alert firing for searchRule with namespaced name %s/%s. Description: %s"
 	SecretNotFoundErrorMessage             = "error fetching secret %s: %v"
 	MissingCredentialsMessage              = "missing credentials in secret %s"
-	GetRulerActionErrorMessage             = "error getting RulerAction from event: %v"
 	EvaluateTemplateErrorMessage           = "error evaluating template message: %v"
 	AlertsPoolErrorMessage                 = "error getting alerts pool: %v"
 	QueryConnectorNotFoundMessage          = "queryConnector %s not found in the resource namespace %s"
@@ -44,7 +42,4 @@ const (
 
 	// Finalizer
 	ResourceFinalizer = "searchruler.prosimcorp.com/finalizer"
-
-	// HTTP event pattern
-	HttpEventPattern = `{"data":"%s","timestamp":"%s"}`
 )

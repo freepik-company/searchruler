@@ -30,9 +30,9 @@ Well, no more! searchruler is here to save the day. This Kubernetes operator let
 ### 🛠️ How It Works
 Setting up searchruler is a breeze. Here are the three main building blocks that’ll make your log life so much easier:
 
-* 🔗 **QueryConnector**: This is where the magic starts. Connect to your log source—whether it’s Elasticsearch, Opensearch, or something cool we’re cooking up for the future.
+* 🔗 **QueryConnector**: This is where the magic starts. Connect to your log source—whether it’s Elasticsearch, Opensearch, or something cool we’re cooking up for the future. The clustered scope solution is named **ClusterQueryConnector**.
 
-* 🚀 **RulerAction**: When a rule is triggered, where should the alert go? Set up webhooks, Slack channels, or anything else you need. We keep it simple, starting with a generic webhook (because everyone loves webhooks).
+* 🚀 **RulerAction**: When a rule is triggered, where should the alert go? Set up webhooks, Slack channels, or anything else you need. We keep it simple, starting with a generic webhook (because everyone loves webhooks). The clustered scope solution is named **ClusterRulerAction**.
 
 * 📜 **SearchRule**: The heart of it all! Define your rules, set the conditions, and craft the message to send when something’s off. This is where you turn log data into actionable alerts.
 
@@ -115,6 +115,8 @@ spec:
       keyUsername: username
       keyPassword: password
 ```
+
+For cluster scope just change **QueryConnector** for **ClusterQueryConenctor**.
 ### 🚀 RulerAction
 
 A RulerAction defines where your alerts will be sent when a SearchRule is triggered (a.k.a. "firing"). Whether it’s a Slack channel, a webhook endpoint, alertmanager or another notification service—you’re in control! 🛠️
@@ -160,6 +162,7 @@ spec:
     #     keyPassword: password
 ```
 
+For cluster scope just change **QueryConnector** for **ClusterRulerAction**.
 ### 📜 SearchRule
 
 This is where the magic happens! SearchRules define the conditions to check in your log sources (via queryconnectors) and specify where to send alerts (using ruleractions). You get to decide what matters and how to act on it. 🎯
@@ -185,6 +188,8 @@ spec:
   # QueryConnector reference to execute the queries for the rule evaluation.
   queryConnectorRef:
     name: queryconnector-sample
+    # Empty namespace it searchs for a clusterqueryconnector resource
+    namespace: "default"
 
   # Interval time for checking the value of the query. For example, every 30s we will
   # execute the query value to elasticsearch
@@ -253,6 +258,8 @@ spec:
   # RuleAction reference to execute when the condition is true.
   actionRef:
     name: ruleraction-sample
+     # Empty namespace it searchs for a clusterruleraction resource
+    namespace: "default"
     # Message template to send in the RuleAction execution. It is a Go template with the
     # object, value and, if exists, elasticsearch aggregations field variables. The object 
     # variable is the SearchRule object and the value variable is the value of the conditionField.
@@ -356,6 +363,7 @@ spec:
   # QueryConnector reference to execute the queries for the rule evaluation.
   queryConnectorRef:
     name: queryconnector-sample
+    namespace: default
 
   # Interval time for checking the value of the query. For example, every 30s we will
   # execute the query value to elasticsearch
@@ -398,6 +406,7 @@ spec:
   # RuleAction reference to execute when the condition is true.
   actionRef:
     name: ruleraction-sample
+    namespace: default
     # Message template to send in the RuleAction execution. It is a Go template with the
     # object, value and, if exists, elasticsearch aggregations field variables. The object 
     # variable is the SearchRule object and the value variable is the value of the conditionField.
