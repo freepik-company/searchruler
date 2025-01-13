@@ -70,8 +70,12 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *CompoundRule
 	if !reflect.ValueOf(resourceSpec.Webhook.Credentials).IsZero() {
 		// First get secret with the credentials
 		RulerActionCredsSecret := &corev1.Secret{}
+		secretNamespace := resourceSpec.Webhook.Credentials.SecretRef.Namespace
+		if secretNamespace == "" {
+			secretNamespace = resourceNamespace
+		}
 		namespacedName := types.NamespacedName{
-			Namespace: resourceNamespace,
+			Namespace: secretNamespace,
 			Name:      resourceSpec.Webhook.Credentials.SecretRef.Name,
 		}
 		err = r.Get(ctx, namespacedName, RulerActionCredsSecret)

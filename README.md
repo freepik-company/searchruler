@@ -112,6 +112,7 @@ spec:
 
     secretRef:
       name: elasticsearch-main-credentials
+      namespace: default
       keyUsername: username
       keyPassword: password
 ```
@@ -158,6 +159,7 @@ spec:
     # credentials:   
     #   secretRef:
     #     name: alertmanager-credentials
+    #     namespace: default
     #     keyUsername: username
     #     keyPassword: password
 ```

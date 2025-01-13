@@ -25,5 +25,6 @@ spec:
 
     secretRef:
       name: elasticsearch-main-credentials
+      namespace: default
       keyUsername: username
       keyPassword: password

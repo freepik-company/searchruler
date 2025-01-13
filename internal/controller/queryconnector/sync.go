@@ -65,8 +65,12 @@ func (r *QueryConnectorReconciler) Sync(ctx context.Context, eventType watch.Eve
 	// First get secret with the credentials. The secret must be in the same
 	// namespace as the QueryConnector resource.
 	QueryConnectorCredsSecret := &v1.Secret{}
+	secretNamespace := resourceSpec.Credentials.SecretRef.Namespace
+	if secretNamespace == "" {
+		secretNamespace = resourceNamespace
+	}
 	namespacedName := types.NamespacedName{
-		Namespace: resourceSpec.Credentials.SecretRef.Namespace,
+		Namespace: secretNamespace,
 		Name:      resourceSpec.Credentials.SecretRef.Name,
 	}
 	err = r.Get(ctx, namespacedName, QueryConnectorCredsSecret)
