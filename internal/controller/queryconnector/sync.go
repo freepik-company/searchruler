@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 
 	//
+	"prosimcorp.com/SearchRuler/api/v1alpha1"
 	"prosimcorp.com/SearchRuler/internal/controller"
 	"prosimcorp.com/SearchRuler/internal/pools"
 )
@@ -33,10 +34,7 @@ import (
 var (
 	resourceNamespace string
 	resourceName      string
-	secretName        string
-	secretNamespace   string
-	secretKeyUsername string
-	secretKeyPassword string
+	resourceSpec      v1alpha1.QueryConnectorSpec
 )
 
 // Sync function is used to synchronize the QueryConnector resource with the credentials. Adds the credentials to the
@@ -48,23 +46,11 @@ func (r *QueryConnectorReconciler) Sync(ctx context.Context, eventType watch.Eve
 	case controller.ClusterQueryConnectorResourceType:
 		resourceNamespace = ""
 		resourceName = resource.ClusterQueryConnectorResource.Name
-		secretName = resource.ClusterQueryConnectorResource.Spec.Credentials.SecretRef.Name
-		secretNamespace = resource.ClusterQueryConnectorResource.Spec.Credentials.SecretRef.Namespace
-		if secretNamespace == "" {
-			secretNamespace = "default"
-		}
-		secretKeyUsername = resource.ClusterQueryConnectorResource.Spec.Credentials.SecretRef.KeyUsername
-		secretKeyPassword = resource.ClusterQueryConnectorResource.Spec.Credentials.SecretRef.KeyPassword
+		resourceSpec = resource.ClusterQueryConnectorResource.Spec
 	case controller.QueryConnectorResourceType:
 		resourceNamespace = resource.QueryConnectorResource.Namespace
 		resourceName = resource.QueryConnectorResource.Name
-		secretName = resource.QueryConnectorResource.Spec.Credentials.SecretRef.Name
-		secretNamespace = resource.QueryConnectorResource.Spec.Credentials.SecretRef.Namespace
-		if secretNamespace == "" {
-			secretNamespace = resourceNamespace
-		}
-		secretKeyUsername = resource.QueryConnectorResource.Spec.Credentials.SecretRef.KeyUsername
-		secretKeyPassword = resource.QueryConnectorResource.Spec.Credentials.SecretRef.KeyPassword
+		resourceSpec = resource.QueryConnectorResource.Spec
 	}
 
 	// If the eventType is Deleted, remove the credentials from the pool
@@ -80,8 +66,8 @@ func (r *QueryConnectorReconciler) Sync(ctx context.Context, eventType watch.Eve
 	// namespace as the QueryConnector resource.
 	QueryConnectorCredsSecret := &v1.Secret{}
 	namespacedName := types.NamespacedName{
-		Namespace: secretNamespace,
-		Name:      secretName,
+		Namespace: resourceSpec.Credentials.SecretRef.Namespace,
+		Name:      resourceSpec.Credentials.SecretRef.Name,
 	}
 	err = r.Get(ctx, namespacedName, QueryConnectorCredsSecret)
 	if err != nil {
@@ -91,8 +77,8 @@ func (r *QueryConnectorReconciler) Sync(ctx context.Context, eventType watch.Eve
 	}
 
 	// Get username and password from the secret data
-	username := string(QueryConnectorCredsSecret.Data[secretKeyUsername])
-	password := string(QueryConnectorCredsSecret.Data[secretKeyPassword])
+	username := string(QueryConnectorCredsSecret.Data[resourceSpec.Credentials.SecretRef.KeyUsername])
+	password := string(QueryConnectorCredsSecret.Data[resourceSpec.Credentials.SecretRef.KeyPassword])
 
 	// If username or password are empty, return an error
 	if username == "" || password == "" {

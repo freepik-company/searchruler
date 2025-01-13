@@ -23,11 +23,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"net/http"
 	"reflect"
 	"strconv"
 	"time"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	corev1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
@@ -134,7 +135,7 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 
 	// Get credentials for QueryConnector attached if defined
 	if !reflect.ValueOf(QueryConnectorSpec.Credentials).IsZero() {
-		key := fmt.Sprintf("%s_%s", resource.Namespace, QueryConnectorResource.GetName())
+		key := fmt.Sprintf("%s_%s", QueryConnectorResource.GetNamespace(), QueryConnectorResource.GetName())
 		queryConnectorCreds, credsExists = r.QueryConnectorCredentialsPool.Get(key)
 		if !credsExists {
 			r.UpdateConditionNoCredsFound(resource)

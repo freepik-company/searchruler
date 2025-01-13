@@ -13,8 +13,8 @@ spec:
 
   # QueryConnector reference to execute the queries for the rule evaluation.
   queryConnectorRef:
-    name: queryconnector-sample
-    namespace: default
+    name: clusterqueryconnector-sample
+    namespace: ""
 
   # Interval time for checking the value of the query. For example, every 30s we will
   # execute the query value to elasticsearch
@@ -101,6 +101,7 @@ spec:
   # RuleAction reference to execute when the condition is true.
   actionRef:
     name: ruleraction-sample
+    namespace: ""
     # Message template to send in the RuleAction execution. It is a Go template with the
     # object, value and, if exists, elasticsearch aggregations field variables. The object 
     # variable is the SearchRule object and the value variable is the value of the conditionField.

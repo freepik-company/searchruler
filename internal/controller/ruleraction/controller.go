@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -45,6 +46,17 @@ type RulerActionReconciler struct {
 	AlertsPool *pools.AlertsStore
 }
 
+type CompoundRulerActionResource struct {
+	RulerActionResource        *searchrulerv1alpha1.RulerAction
+	ClusterRulerActionResource *searchrulerv1alpha1.ClusterRulerAction
+}
+
+var (
+	resourceType      string
+	containsFinalizer bool
+	deletionTimestamp *v1.Time
+)
+
 // +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=ruleractions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=ruleractions/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=ruleractions/finalizers,verbs=update
@@ -62,17 +74,27 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	logger := log.FromContext(ctx)
 
 	// 1. Get the content of the Patch
+	CompoundRulerActionResource := &CompoundRulerActionResource{
+		RulerActionResource:        &searchrulerv1alpha1.RulerAction{},
+		ClusterRulerActionResource: &searchrulerv1alpha1.ClusterRulerAction{},
+	}
 
 	// 1.1 Try with Event resource first. If it is not an Event, then it will return an error
 	// but reconcile will try if it is a RulerAction resource relationated with an Event
-	RulerActionResource := &searchrulerv1alpha1.RulerAction{}
-	*RulerActionResource, err = r.GetEventRuleAction(ctx, req.Namespace, req.Name)
+	*CompoundRulerActionResource, err = r.GetEventRuleAction(ctx, req.Namespace, req.Name, resourceType)
 	if err == nil {
 		goto processEvent
 	}
 
 	// 1.2 Try with RulerAction resource
-	err = r.Get(ctx, req.NamespacedName, RulerActionResource)
+	switch req.Namespace {
+	case "":
+		resourceType = controller.ClusterRulerActionResourceType
+		err = r.Get(ctx, req.NamespacedName, CompoundRulerActionResource.ClusterRulerActionResource)
+	default:
+		resourceType = controller.RulerActionResourceType
+		err = r.Get(ctx, req.NamespacedName, CompoundRulerActionResource.RulerActionResource)
+	}
 
 	// 2. Check existence on the cluster
 	if err != nil {
@@ -89,13 +111,28 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// 3. Check if the SearchRule instance is marked to be deleted: indicated by the deletion timestamp being set
-	if !RulerActionResource.DeletionTimestamp.IsZero() {
-		if controllerutil.ContainsFinalizer(RulerActionResource, controller.ResourceFinalizer) {
+	switch resourceType {
+	case controller.ClusterRulerActionResourceType:
+		deletionTimestamp = CompoundRulerActionResource.ClusterRulerActionResource.DeletionTimestamp
+		containsFinalizer = controllerutil.ContainsFinalizer(CompoundRulerActionResource.ClusterRulerActionResource, controller.ResourceFinalizer)
+	default:
+		deletionTimestamp = CompoundRulerActionResource.RulerActionResource.DeletionTimestamp
+		containsFinalizer = controllerutil.ContainsFinalizer(CompoundRulerActionResource.RulerActionResource, controller.ResourceFinalizer)
+	}
+	if !deletionTimestamp.IsZero() {
+		if containsFinalizer {
+
 			// Remove the finalizers on Patch CR
-			controllerutil.RemoveFinalizer(RulerActionResource, controller.ResourceFinalizer)
-			err = r.Update(ctx, RulerActionResource)
+			switch resourceType {
+			case controller.ClusterRulerActionResourceType:
+				controllerutil.RemoveFinalizer(CompoundRulerActionResource.ClusterRulerActionResource, controller.ResourceFinalizer)
+				err = r.Update(ctx, CompoundRulerActionResource.ClusterRulerActionResource)
+			default:
+				controllerutil.RemoveFinalizer(CompoundRulerActionResource.RulerActionResource, controller.ResourceFinalizer)
+				err = r.Update(ctx, CompoundRulerActionResource.RulerActionResource)
+			}
 			if err != nil {
-				logger.Info(fmt.Sprintf(controller.ResourceFinalizersUpdateError, controller.RulerActionResourceType, req.NamespacedName, err.Error()))
+				logger.Info(fmt.Sprintf(controller.ResourceFinalizersUpdateError, resourceType, req.NamespacedName, err.Error()))
 			}
 		}
 
@@ -105,9 +142,15 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// 4. Add finalizer to the SearchRule CR
-	if !controllerutil.ContainsFinalizer(RulerActionResource, controller.ResourceFinalizer) {
-		controllerutil.AddFinalizer(RulerActionResource, controller.ResourceFinalizer)
-		err = r.Update(ctx, RulerActionResource)
+	if !containsFinalizer {
+		switch resourceType {
+		case controller.ClusterRulerActionResourceType:
+			controllerutil.AddFinalizer(CompoundRulerActionResource.ClusterRulerActionResource, controller.ResourceFinalizer)
+			err = r.Update(ctx, CompoundRulerActionResource.ClusterRulerActionResource)
+		default:
+			controllerutil.AddFinalizer(CompoundRulerActionResource.RulerActionResource, controller.ResourceFinalizer)
+			err = r.Update(ctx, CompoundRulerActionResource.RulerActionResource)
+		}
 		if err != nil {
 			return result, err
 		}
@@ -115,11 +158,15 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// 5. Update the status before the requeue
 	defer func() {
-		err = r.Status().Update(ctx, RulerActionResource)
-		if err != nil {
-			logger.Info(fmt.Sprintf(controller.ResourceConditionUpdateError, controller.RulerActionResourceType, req.NamespacedName, err.Error()))
+		switch resourceType {
+		case controller.ClusterRulerActionResourceType:
+			err = r.Status().Update(ctx, CompoundRulerActionResource.ClusterRulerActionResource)
+		default:
+			err = r.Status().Update(ctx, CompoundRulerActionResource.RulerActionResource)
 		}
-
+		if err != nil {
+			logger.Info(fmt.Sprintf(controller.ResourceConditionUpdateError, resourceType, req.NamespacedName, err.Error()))
+		}
 	}()
 
 	// 6. Schedule periodical request
@@ -136,15 +183,15 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// 7. Sync credentials if defined
 processEvent:
-	err = r.Sync(ctx, RulerActionResource)
+	err = r.Sync(ctx, CompoundRulerActionResource, resourceType)
 	if err != nil {
-		r.UpdateConditionKubernetesApiCallFailure(RulerActionResource)
+		r.UpdateConditionKubernetesApiCallFailure(CompoundRulerActionResource, resourceType)
 		logger.Info(fmt.Sprintf(controller.SyncTargetError, controller.RulerActionResourceType, req.NamespacedName, err.Error()))
 		return result, err
 	}
 
 	// 8. Success, update the status
-	r.UpdateConditionSuccess(RulerActionResource)
+	r.UpdateConditionSuccess(CompoundRulerActionResource, resourceType)
 
 	return result, err
 }
