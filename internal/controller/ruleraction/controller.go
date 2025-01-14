@@ -81,9 +81,8 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// 1.1 Try with Event resource first. If it is not an Event, then it will return an error
 	// but reconcile will try if it is a RulerAction resource relationated with an Event
-	tempCompoundRulerActionResource, err := r.GetEventRuleAction(ctx, req.Namespace, req.Name, resourceType)
+	err = r.GetEventRuleAction(ctx, CompoundRulerActionResource, req.Namespace, req.Name)
 	if err == nil {
-		*CompoundRulerActionResource = tempCompoundRulerActionResource
 		goto processEvent
 	}
 
