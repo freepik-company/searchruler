@@ -3,4 +3,6 @@ resources:
 - searchruler_v1alpha1_ruleraction.yaml
 - searchruler_v1alpha1_searchrule.yaml
 - searchruler_v1alpha1_queryconnector.yaml
+- searchruler_v1alpha1_clusterqueryconnector.yaml
+- searchruler_v1alpha1_clusterruleraction.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

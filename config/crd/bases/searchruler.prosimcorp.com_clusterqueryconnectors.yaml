@@ -4,22 +4,22 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.4
-  name: searchrules.searchruler.prosimcorp.com
+  name: clusterqueryconnectors.searchruler.prosimcorp.com
 spec:
   group: searchruler.prosimcorp.com
   names:
-    kind: SearchRule
-    listKind: SearchRuleList
-    plural: searchrules
-    singular: searchrule
-  scope: Namespaced
+    kind: ClusterQueryConnector
+    listKind: ClusterQueryConnectorList
+    plural: clusterqueryconnectors
+    singular: clusterqueryconnector
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.conditions[?(@.type=="ResourceSynced")].status
       name: Ready
       type: string
     - jsonPath: .status.conditions[?(@.type=="State")].reason
-      name: AlertStatus
+      name: Status
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
@@ -27,7 +27,8 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: SearchRule is the Schema for the searchrules API.
+        description: ClusterQueryConnector is the Schema for the clusterqueryconnectors
+          API.
         properties:
           apiVersion:
             description: |-
@@ -47,75 +48,45 @@ spec:
           metadata:
             type: object
           spec:
-            description: SearchRuleSpec defines the desired state of SearchRule.
+            description: QueryConnectorSpec defines the desired state of QueryConnector.
             properties:
-              actionRef:
-                description: ActionRef TODO
+              credentials:
+                description: QueryConnectorCredentials TODO
                 properties:
-                  data:
-                    type: string
-                  name:
-                    type: string
-                  namespace:
+                  secretRef:
+                    description: SecretRef TODO
+                    properties:
+                      keyPassword:
+                        type: string
+                      keyUsername:
+                        type: string
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                    required:
+                    - keyPassword
+                    - keyUsername
+                    - name
+                    type: object
+                  syncInterval:
                     type: string
                 required:
-                - data
-                - name
-                - namespace
+                - secretRef
                 type: object
-              checkInterval:
+              headers:
+                additionalProperties:
+                  type: string
+                type: object
+              tlsSkipVerify:
+                type: boolean
+              url:
                 type: string
-              condition:
-                description: Condition TODO
-                properties:
-                  for:
-                    type: string
-                  operator:
-                    type: string
-                  threshold:
-                    type: string
-                required:
-                - for
-                - operator
-                - threshold
-                type: object
-              description:
-                type: string
-              elasticsearch:
-                description: Elasticsearch TODO
-                properties:
-                  conditionField:
-                    type: string
-                  index:
-                    type: string
-                  query:
-                    x-kubernetes-preserve-unknown-fields: true
-                  queryJSON:
-                    type: string
-                required:
-                - conditionField
-                - index
-                type: object
-              queryConnectorRef:
-                description: QueryConnectorRef TODO
-                properties:
-                  name:
-                    type: string
-                  namespace:
-                    type: string
-                required:
-                - name
-                - namespace
-                type: object
             required:
-            - actionRef
-            - checkInterval
-            - condition
-            - elasticsearch
-            - queryConnectorRef
+            - url
             type: object
           status:
-            description: SearchRuleStatus defines the observed state of SearchRule.
+            description: QueryConnectorStatus defines the observed state of QueryConnector.
             properties:
               conditions:
                 items:

@@ -1,10 +1,10 @@
 apiVersion: searchruler.prosimcorp.com/v1alpha1
-kind: RulerAction
+kind: ClusterRulerAction
 metadata:
   labels:
     app.kubernetes.io/name: search-ruler
     app.kubernetes.io/managed-by: kustomize
-  name: ruleraction-sample
+  name: clusterruleraction-sample
 spec:
 
   # Webhook integration configuration to send alerts.
@@ -30,7 +30,7 @@ spec:
     # validator: alertmanager
 
     # Credentials to authenticate in the webhook if needed
-    # credentials:   
+    # credentials:
     #   secretRef:
     #     name: alertmanager-credentials
     #     namespace: default

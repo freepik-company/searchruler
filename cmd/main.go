@@ -21,6 +21,9 @@ import (
 	"crypto/tls"
 	"flag"
 	"os"
+	"prosimcorp.com/SearchRuler/internal/controller/queryconnector"
+	"prosimcorp.com/SearchRuler/internal/controller/ruleraction"
+	"prosimcorp.com/SearchRuler/internal/controller/searchrule"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -37,7 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
-	"prosimcorp.com/SearchRuler/internal/controller"
 	"prosimcorp.com/SearchRuler/internal/globals"
 	"prosimcorp.com/SearchRuler/internal/pools"
 	"prosimcorp.com/SearchRuler/internal/webserver"
@@ -177,7 +179,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.RulerActionReconciler{
+	if err = (&ruleraction.RulerActionReconciler{
 		Client:     mgr.GetClient(),
 		Scheme:     mgr.GetScheme(),
 		AlertsPool: AlertsPool,
@@ -186,7 +188,7 @@ func main() {
 		os.Exit(1)
 	}
 	mgr.GetEventRecorderFor("CREATE")
-	if err = (&controller.SearchRuleReconciler{
+	if err = (&searchrule.SearchRuleReconciler{
 		Client:                        mgr.GetClient(),
 		Scheme:                        mgr.GetScheme(),
 		QueryConnectorCredentialsPool: QueryConnectorCredentialsPool,
@@ -196,7 +198,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "SearchRule")
 		os.Exit(1)
 	}
-	if err = (&controller.QueryConnectorReconciler{
+	if err = (&queryconnector.QueryConnectorReconciler{
 		Client:          mgr.GetClient(),
 		Scheme:          mgr.GetScheme(),
 		CredentialsPool: QueryConnectorCredentialsPool,

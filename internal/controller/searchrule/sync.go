@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package searchrule
 
 import (
 	"bytes"
@@ -28,18 +28,21 @@ import (
 	"strconv"
 	"time"
 
-	"sigs.k8s.io/controller-runtime/pkg/log"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	corev1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-	"prosimcorp.com/SearchRuler/api/v1alpha1"
-	"prosimcorp.com/SearchRuler/internal/globals"
-	"prosimcorp.com/SearchRuler/internal/pools"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/tidwall/gjson"
+
+	//
+	"prosimcorp.com/SearchRuler/api/v1alpha1"
+	"prosimcorp.com/SearchRuler/internal/controller"
+	"prosimcorp.com/SearchRuler/internal/globals"
+	"prosimcorp.com/SearchRuler/internal/pools"
 )
 
 const (
@@ -87,29 +90,55 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 		return nil
 	}
 
-	// Get QueryConnector associated to the rule
-	QueryConnectorResource := &v1alpha1.QueryConnector{}
-	QueryConnectorNamespacedName := types.NamespacedName{
-		Namespace: resource.Namespace,
-		Name:      resource.Spec.QueryConnectorRef.Name,
+	// Get QueryConnector associated to the rule with KubeRawClient
+	gvr := schema.GroupVersionResource{
+		Group:    v1alpha1.GroupVersion.Group,
+		Version:  v1alpha1.GroupVersion.Version,
+		Resource: "clusterqueryconnectors",
 	}
-	err = r.Get(ctx, QueryConnectorNamespacedName, QueryConnectorResource)
+
+	queryConnectorWrapper := globals.Application.KubeRawClient.Resource(gvr)
+	if resource.Spec.QueryConnectorRef.Namespace != "" {
+		gvr.Resource = "queryconnectors"
+		queryConnectorWrapper = globals.Application.KubeRawClient.Resource(gvr)
+		queryConnectorWrapper.Namespace(resource.Spec.QueryConnectorRef.Namespace)
+	}
+
+	QueryConnectorResource, err := queryConnectorWrapper.Get(ctx, resource.Spec.QueryConnectorRef.Name, metav1.GetOptions{})
+	if err != nil {
+		// TODO: Improve this
+		return err
+	}
+
+	// If QueryConnector is empty then error
 	if reflect.ValueOf(QueryConnectorResource).IsZero() {
 		r.UpdateConditionQueryConnectorNotFound(resource)
 		return fmt.Errorf(
-			QueryConnectorNotFoundMessage,
+			controller.QueryConnectorNotFoundMessage,
 			resource.Spec.QueryConnectorRef.Name,
 			resource.Namespace,
 		)
 	}
 
+	// Tricky for save queryConnector resource with QueryConnectorSpec type
+	QueryConnectorSpec := &v1alpha1.QueryConnectorSpec{}
+	QueryConnectorSpecI := QueryConnectorResource.Object["spec"]
+	specBytes, err := json.Marshal(QueryConnectorSpecI)
+	if err != nil {
+		return fmt.Errorf(controller.JSONMarshalErrorMessage, err)
+	}
+	err = json.Unmarshal(specBytes, QueryConnectorSpec)
+	if err != nil {
+		return fmt.Errorf(controller.JSONMarshalErrorMessage, err)
+	}
+
 	// Get credentials for QueryConnector attached if defined
-	if !reflect.ValueOf(QueryConnectorResource.Spec.Credentials).IsZero() {
-		key := fmt.Sprintf("%s_%s", resource.Namespace, QueryConnectorResource.Name)
+	if !reflect.ValueOf(QueryConnectorSpec.Credentials).IsZero() {
+		key := fmt.Sprintf("%s_%s", QueryConnectorResource.GetNamespace(), QueryConnectorResource.GetName())
 		queryConnectorCreds, credsExists = r.QueryConnectorCredentialsPool.Get(key)
 		if !credsExists {
 			r.UpdateConditionNoCredsFound(resource)
-			return fmt.Errorf(MissingCredentialsMessage, key)
+			return fmt.Errorf(controller.MissingCredentialsMessage, key)
 		}
 	}
 
@@ -117,19 +146,19 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 	// then the rule is really ocurring and must be an alert
 	forDuration, err := time.ParseDuration(resource.Spec.Condition.For)
 	if err != nil {
-		return fmt.Errorf(ForValueParseErrorMessage, err)
+		return fmt.Errorf(controller.ForValueParseErrorMessage, err)
 	}
 
 	// Check if query is defined in the resource
 	if resource.Spec.Elasticsearch.Query == nil && resource.Spec.Elasticsearch.QueryJSON == "" {
 		r.UpdateConditionNoQueryFound(resource)
-		return fmt.Errorf(QueryNotDefinedErrorMessage, resource.Name)
+		return fmt.Errorf(controller.QueryNotDefinedErrorMessage, resource.Name)
 	}
 
 	// Check if both query and queryJson are defined. If true, return error
 	if resource.Spec.Elasticsearch.Query != nil && resource.Spec.Elasticsearch.QueryJSON != "" {
 		r.UpdateConditionNoQueryFound(resource)
-		return fmt.Errorf(QueryDefinedInBothErrorMessage, resource.Name)
+		return fmt.Errorf(controller.QueryDefinedInBothErrorMessage, resource.Name)
 	}
 
 	// Select query to use and marshall to JSON
@@ -138,7 +167,7 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 	if resource.Spec.Elasticsearch.Query != nil {
 		elasticQuery, err = json.Marshal(resource.Spec.Elasticsearch.Query)
 		if err != nil {
-			return fmt.Errorf(JSONMarshalErrorMessage, err)
+			return fmt.Errorf(controller.JSONMarshalErrorMessage, err)
 		}
 	}
 	// If queryJSON is defined in the resource, it is already a JSON, just convert it to bytes
@@ -150,7 +179,7 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 	httpClient := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: QueryConnectorResource.Spec.TlsSkipVerify,
+				InsecureSkipVerify: QueryConnectorSpec.TlsSkipVerify,
 			},
 		},
 	}
@@ -158,23 +187,23 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 	// Generate URL for search to elasticsearch
 	searchURL := fmt.Sprintf(
 		ElasticsearchSearchURL,
-		QueryConnectorResource.Spec.URL,
+		QueryConnectorSpec.URL,
 		resource.Spec.Elasticsearch.Index,
 	)
 	req, err := http.NewRequest("POST", searchURL, bytes.NewBuffer(elasticQuery))
 	if err != nil {
 		r.UpdateConditionConnectionError(resource)
-		return fmt.Errorf(HttpRequestCreationErrorMessage, err)
+		return fmt.Errorf(controller.HttpRequestCreationErrorMessage, err)
 	}
 
 	// Add headers and custom headers for elasticsearch queries
 	req.Header.Set("Content-Type", "application/json")
-	for key, value := range QueryConnectorResource.Spec.Headers {
+	for key, value := range QueryConnectorSpec.Headers {
 		req.Header.Set(key, value)
 	}
 
 	// Add authentication if set for elasticsearch queries
-	if QueryConnectorResource.Spec.Credentials.SecretRef.Name != "" {
+	if QueryConnectorSpec.Credentials.SecretRef.Name != "" {
 		req.SetBasicAuth(queryConnectorCreds.Username, queryConnectorCreds.Password)
 	}
 
@@ -182,7 +211,7 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		r.UpdateConditionConnectionError(resource)
-		return fmt.Errorf(ElasticsearchQueryErrorMessage, string(elasticQuery), err)
+		return fmt.Errorf(controller.ElasticsearchQueryErrorMessage, string(elasticQuery), err)
 	}
 	defer resp.Body.Close()
 
@@ -190,12 +219,12 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		r.UpdateConditionQueryError(resource)
-		return fmt.Errorf(ResponseBodyReadErrorMessage, err)
+		return fmt.Errorf(controller.ResponseBodyReadErrorMessage, err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		r.UpdateConditionQueryError(resource)
 		return fmt.Errorf(
-			ElasticsearchQueryResponseErrorMessage,
+			controller.ElasticsearchQueryResponseErrorMessage,
 			string(elasticQuery),
 			string(responseBody),
 		)
@@ -206,7 +235,7 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 	if !conditionValue.Exists() {
 		r.UpdateConditionQueryError(resource)
 		return fmt.Errorf(
-			ConditionFieldNotFoundMessage,
+			controller.ConditionFieldNotFoundMessage,
 			resource.Spec.Elasticsearch.ConditionField,
 			string(responseBody),
 		)
@@ -225,7 +254,7 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 	if err != nil {
 		r.UpdateConditionQueryError(resource)
 		return fmt.Errorf(
-			EvaluatingConditionErrorMessage,
+			controller.EvaluatingConditionErrorMessage,
 			err,
 		)
 	}
@@ -289,7 +318,7 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 				fmt.Sprintf("Rule is in firing state. Current value is %v", conditionValue),
 			)
 			if err != nil {
-				return fmt.Errorf(KubeEventCreationErrorMessage, err)
+				return fmt.Errorf(controller.KubeEventCreationErrorMessage, err)
 			}
 
 			// Log the alert and change the AlertStatus to Firing of the searchRule

@@ -3,21 +3,22 @@ package controller
 const (
 
 	// Resource types
-	SearchRuleResourceType     = "SearchRule"
-	RulerActionResourceType    = "RulerAction"
-	QueryConnectorResourceType = "QueryConnector"
+	SearchRuleResourceType            = "SearchRule"
+	RulerActionResourceType           = "RulerAction"
+	QueryConnectorResourceType        = "QueryConnector"
+	ClusterQueryConnectorResourceType = "ClusterQueryConnector"
+	ClusterRulerActionResourceType    = "ClusterRulerAction"
 
 	// Sync interval to check if secrets of SearchRuleAction and SearchRuleQueryConnector are up to date
-	defaultSyncInterval = "1m"
+	DefaultSyncInterval = "1m"
 
 	// Error messages
-	resourceNotFoundError                  = "%s '%s' resource not found. Ignoring since object must be deleted."
-	resourceRetrievalError                 = "Error getting the %s '%s' from the cluster: %s"
-	resourceTargetsDeleteError             = "Failed to delete targets of %s '%s': %s"
-	resourceFinalizersUpdateError          = "Failed to update finalizer of %s '%s': %s"
-	resourceConditionUpdateError           = "Failed to update the condition on %s '%s': %s"
-	resourceSyncTimeRetrievalError         = "can not get synchronization time from the %s '%s': %s"
-	syncTargetError                        = "can not sync the target for the %s '%s': %s"
+	ResourceNotFoundError                  = "%s '%s' resource not found. Ignoring since object must be deleted."
+	CanNotGetResourceError                 = "%s '%s' resource not found. Error: %v"
+	ResourceFinalizersUpdateError          = "Failed to update finalizer of %s '%s': %s"
+	ResourceConditionUpdateError           = "Failed to update the condition on %s '%s': %s"
+	ResourceSyncTimeRetrievalError         = "can not get synchronization time from the %s '%s': %s"
+	SyncTargetError                        = "can not sync the target for the %s '%s': %s"
 	ValidatorNotFoundErrorMessage          = "validator %s not found"
 	ValidationFailedErrorMessage           = "validation failed: %s"
 	HttpRequestCreationErrorMessage        = "error creating http request: %s"
@@ -25,7 +26,6 @@ const (
 	AlertFiringInfoMessage                 = "alert firing for searchRule with namespaced name %s/%s. Description: %s"
 	SecretNotFoundErrorMessage             = "error fetching secret %s: %v"
 	MissingCredentialsMessage              = "missing credentials in secret %s"
-	GetRulerActionErrorMessage             = "error getting RulerAction from event: %v"
 	EvaluateTemplateErrorMessage           = "error evaluating template message: %v"
 	AlertsPoolErrorMessage                 = "error getting alerts pool: %v"
 	QueryConnectorNotFoundMessage          = "queryConnector %s not found in the resource namespace %s"
@@ -41,8 +41,5 @@ const (
 	KubeEventCreationErrorMessage          = "error creating kube event: %v"
 
 	// Finalizer
-	resourceFinalizer = "searchruler.prosimcorp.com/finalizer"
-
-	// HTTP event pattern
-	HttpEventPattern = `{"data":"%s","timestamp":"%s"}`
+	ResourceFinalizer = "searchruler.prosimcorp.com/finalizer"
 )

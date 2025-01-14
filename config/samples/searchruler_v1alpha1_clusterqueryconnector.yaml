@@ -1,10 +1,10 @@
 apiVersion: searchruler.prosimcorp.com/v1alpha1
-kind: QueryConnector
+kind: ClusterQueryConnector
 metadata:
   labels:
     app.kubernetes.io/name: search-ruler
     app.kubernetes.io/managed-by: kustomize
-  name: queryconnector-sample
+  name: clusterqueryconnector-sample
 spec:
 
   # URL for the query connector. We will execute the queries in this URL

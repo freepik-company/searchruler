@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package ruleraction
 
 import (
 	"bytes"
@@ -27,11 +27,14 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	//
 	"prosimcorp.com/SearchRuler/api/v1alpha1"
+	"prosimcorp.com/SearchRuler/internal/controller"
 	"prosimcorp.com/SearchRuler/internal/pools"
 	"prosimcorp.com/SearchRuler/internal/template"
 	"prosimcorp.com/SearchRuler/internal/validators"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
@@ -39,66 +42,84 @@ var (
 	validatorsMap = map[string]func(data string) (result bool, hint string, err error){
 		"alertmanager": validators.ValidateAlertmanager,
 	}
+	resourceNamespace string
+	resourceName      string
+	resourceSpec      v1alpha1.RulerActionSpec
 )
 
 // Sync function is used to synchronize the RulerAction resource with the alerts. Executes the webhook defined in the
 // resource for each alert found in the AlertsPool.
-func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.RulerAction) (err error) {
+func (r *RulerActionReconciler) Sync(ctx context.Context, resource *CompoundRulerActionResource, resourceType string) (err error) {
 
 	logger := log.FromContext(ctx)
+	// Get the resource values depending on the resourceType
+	switch resourceType {
+	case controller.ClusterRulerActionResourceType:
+		resourceNamespace = ""
+		resourceName = resource.ClusterRulerActionResource.Name
+		resourceSpec = resource.ClusterRulerActionResource.Spec
+	case controller.RulerActionResourceType:
+		resourceNamespace = resource.RulerActionResource.Namespace
+		resourceName = resource.RulerActionResource.Name
+		resourceSpec = resource.RulerActionResource.Spec
+	}
 
 	// Get credentials for the Action in the secret associated if defined
 	username := ""
 	password := ""
-	if !reflect.ValueOf(resource.Spec.Webhook.Credentials).IsZero() {
+	if !reflect.ValueOf(resourceSpec.Webhook.Credentials).IsZero() {
 		// First get secret with the credentials
 		RulerActionCredsSecret := &corev1.Secret{}
+		secretNamespace := resourceSpec.Webhook.Credentials.SecretRef.Namespace
+		if secretNamespace == "" {
+			secretNamespace = resourceNamespace
+		}
 		namespacedName := types.NamespacedName{
-			Namespace: resource.Namespace,
-			Name:      resource.Spec.Webhook.Credentials.SecretRef.Name,
+			Namespace: secretNamespace,
+			Name:      resourceSpec.Webhook.Credentials.SecretRef.Name,
 		}
 		err = r.Get(ctx, namespacedName, RulerActionCredsSecret)
 		if err != nil {
-			r.UpdateConditionNoCredsFound(resource)
-			return fmt.Errorf(SecretNotFoundErrorMessage, namespacedName, err)
+			r.UpdateConditionNoCredsFound(resource, resourceType)
+			return fmt.Errorf(controller.SecretNotFoundErrorMessage, namespacedName, err)
 		}
 
 		// Get username and password
-		username = string(RulerActionCredsSecret.Data[resource.Spec.Webhook.Credentials.SecretRef.KeyUsername])
-		password = string(RulerActionCredsSecret.Data[resource.Spec.Webhook.Credentials.SecretRef.KeyPassword])
+		username = string(RulerActionCredsSecret.Data[resourceSpec.Webhook.Credentials.SecretRef.KeyUsername])
+		password = string(RulerActionCredsSecret.Data[resourceSpec.Webhook.Credentials.SecretRef.KeyPassword])
 		if username == "" || password == "" {
-			r.UpdateConditionNoCredsFound(resource)
-			return fmt.Errorf(MissingCredentialsMessage, namespacedName)
+			r.UpdateConditionNoCredsFound(resource, resourceType)
+			return fmt.Errorf(controller.MissingCredentialsMessage, namespacedName)
 		}
 	}
 
 	// Check alert pool for alerts related to this rulerAction
 	// Alerts key pattern: namespace/rulerActionName/searchRuleName
-	alerts, err := r.getRulerActionAssociatedAlerts(resource)
+	alerts, err := r.getRulerActionAssociatedAlerts(resourceName)
 	if err != nil {
-		return fmt.Errorf(AlertsPoolErrorMessage, err)
+		return fmt.Errorf(controller.AlertsPoolErrorMessage, err)
 	}
 
-	// If there are alerts for the rulerAction, initialice the HTTP client
+	// If there are alerts for the rulerAction, initialize the HTTP client
 	if len(alerts) > 0 {
 		// Create the HTTP client
 		httpClient := &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: resource.Spec.Webhook.TlsSkipVerify,
+					InsecureSkipVerify: resourceSpec.Webhook.TlsSkipVerify,
 				},
 			},
 		}
 
 		// Create the request with the configured verb and URL
-		httpRequest, err := http.NewRequest(resource.Spec.Webhook.Verb, resource.Spec.Webhook.Url, nil)
+		httpRequest, err := http.NewRequest(resourceSpec.Webhook.Verb, resourceSpec.Webhook.Url, nil)
 		if err != nil {
-			return fmt.Errorf(HttpRequestCreationErrorMessage, err)
+			return fmt.Errorf(controller.HttpRequestCreationErrorMessage, err)
 		}
 
 		// Add headers to the request if set
 		httpRequest.Header.Set("Content-Type", "application/json")
-		for headerKey, headerValue := range resource.Spec.Webhook.Headers {
+		for headerKey, headerValue := range resourceSpec.Webhook.Headers {
 			httpRequest.Header.Set(headerKey, headerValue)
 		}
 
@@ -113,7 +134,7 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 
 			// Log alert firing
 			logger.Info(fmt.Sprintf(
-				AlertFiringInfoMessage,
+				controller.AlertFiringInfoMessage,
 				alert.SearchRule.Namespace,
 				alert.SearchRule.Name,
 				alert.SearchRule.Spec.Description,
@@ -130,31 +151,31 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 			// Evaluate the data template with the injected object
 			parsedMessage, err := template.EvaluateTemplate(alert.SearchRule.Spec.ActionRef.Data, templateInjectedObject)
 			if err != nil {
-				r.UpdateConditionEvaluateTemplateError(resource)
-				return fmt.Errorf(EvaluateTemplateErrorMessage, err)
+				r.UpdateConditionEvaluateTemplateError(resource, resourceType)
+				return fmt.Errorf(controller.EvaluateTemplateErrorMessage, err)
 			}
 
 			// Check if the webhook has a validator and execute it when available
-			if resource.Spec.Webhook.Validator != "" {
+			if resourceSpec.Webhook.Validator != "" {
 
 				// Check if the validator is available
-				_, validatorFound := validatorsMap[resource.Spec.Webhook.Validator]
+				_, validatorFound := validatorsMap[resourceSpec.Webhook.Validator]
 				if !validatorFound {
-					r.UpdateConditionEvaluateTemplateError(resource)
-					return fmt.Errorf(ValidatorNotFoundErrorMessage, resource.Spec.Webhook.Validator)
+					r.UpdateConditionEvaluateTemplateError(resource, resourceType)
+					return fmt.Errorf(controller.ValidatorNotFoundErrorMessage, resourceSpec.Webhook.Validator)
 				}
 
 				// Execute the validator to the data of the alert
-				validatorResult, validatorHint, err := validatorsMap[resource.Spec.Webhook.Validator](parsedMessage)
+				validatorResult, validatorHint, err := validatorsMap[resourceSpec.Webhook.Validator](parsedMessage)
 				if err != nil {
-					r.UpdateConditionEvaluateTemplateError(resource)
-					return fmt.Errorf(ValidationFailedErrorMessage, err.Error())
+					r.UpdateConditionEvaluateTemplateError(resource, resourceType)
+					return fmt.Errorf(controller.ValidationFailedErrorMessage, err.Error())
 				}
 
 				// Check the result of the validator
 				if !validatorResult {
-					r.UpdateConditionEvaluateTemplateError(resource)
-					return fmt.Errorf(ValidationFailedErrorMessage, validatorHint)
+					r.UpdateConditionEvaluateTemplateError(resource, resourceType)
+					return fmt.Errorf(controller.ValidationFailedErrorMessage, validatorHint)
 				}
 			}
 
@@ -165,8 +186,8 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 			// Send HTTP request to the webhook
 			httpResponse, err := httpClient.Do(httpRequest)
 			if err != nil {
-				r.UpdateConditionConnectionError(resource)
-				return fmt.Errorf(HttpRequestSendingErrorMessage, err)
+				r.UpdateConditionConnectionError(resource, resourceType)
+				return fmt.Errorf(controller.HttpRequestSendingErrorMessage, err)
 			}
 
 			defer httpResponse.Body.Close()
@@ -174,12 +195,12 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *v1alpha1.Rul
 	}
 
 	// Updates status to Success
-	r.UpdateStateSuccess(resource)
+	r.UpdateStateSuccess(resource, resourceType)
 	return nil
 }
 
 // GetRuleActionFromEvent returns the RulerAction resource associated with the event that triggered the reconcile
-func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, namespace, name string) (ruleAction v1alpha1.RulerAction, err error) {
+func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, namespace, name, resourceType string) (ruleAction CompoundRulerActionResource, err error) {
 
 	// Get event resource from the namespace and name of the event that triggered the reconcile
 	EventResource := &corev1.Event{}
@@ -213,12 +234,17 @@ func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, namespac
 	}
 
 	// Get RulerAction resource from searchRule resource
-	ruleAction = v1alpha1.RulerAction{}
 	ruleActionNamespacedName := types.NamespacedName{
-		Namespace: searchRule.Namespace,
+		Namespace: searchRule.Spec.ActionRef.Namespace,
 		Name:      searchRule.Spec.ActionRef.Name,
 	}
-	err = r.Get(ctx, ruleActionNamespacedName, &ruleAction)
+
+	switch resourceType {
+	case controller.ClusterRulerActionResourceType:
+		err = r.Get(ctx, ruleActionNamespacedName, ruleAction.ClusterRulerActionResource)
+	default:
+		err = r.Get(ctx, ruleActionNamespacedName, ruleAction.RulerActionResource)
+	}
 	if err != nil {
 		return ruleAction, fmt.Errorf(
 			"error fetching RulerAction %s from searchRule %s: %v",
@@ -232,14 +258,14 @@ func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, namespac
 }
 
 // getRulerActionAssociatedAlerts returns all alerts associated with the RulerAction
-func (r *RulerActionReconciler) getRulerActionAssociatedAlerts(resource *v1alpha1.RulerAction) (alerts []*pools.Alert, err error) {
+func (r *RulerActionReconciler) getRulerActionAssociatedAlerts(resourceName string) (alerts []*pools.Alert, err error) {
 
 	// Get all alerts from the AlertsPool
 	alertsPool := r.AlertsPool.GetAll()
 
 	// Iterate over the alerts in the pool and check if the alert is associated with the RulerAction
 	for _, alert := range alertsPool {
-		if alert.RulerActionName == resource.Name {
+		if alert.RulerActionName == resourceName {
 			alerts = append(alerts, alert)
 		}
 	}
