@@ -20,9 +20,13 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"net/http"
+	"prosimcorp.com/SearchRuler/internal/globals"
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
@@ -200,7 +204,7 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *CompoundRule
 }
 
 // GetRuleActionFromEvent returns the RulerAction resource associated with the event that triggered the reconcile
-func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, namespace, name, resourceType string) (ruleAction CompoundRulerActionResource, err error) {
+func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, ruleAction *CompoundRulerActionResource, namespace, name string) (err error) {
 
 	// Get event resource from the namespace and name of the event that triggered the reconcile
 	EventResource := &corev1.Event{}
@@ -210,7 +214,7 @@ func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, namespac
 	}
 	err = r.Get(ctx, namespacedName, EventResource)
 	if err != nil {
-		return ruleAction, fmt.Errorf(
+		return fmt.Errorf(
 			"reconcile not triggered by event, triggered by resource %s : %v",
 			namespacedName,
 			err.Error(),
@@ -225,7 +229,7 @@ func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, namespac
 	}
 	err = r.Get(ctx, searchRuleNamespacedName, searchRule)
 	if err != nil {
-		return ruleAction, fmt.Errorf(
+		return fmt.Errorf(
 			"error fetching SearchRule %s from event %s: %v",
 			searchRuleNamespacedName,
 			namespacedName,
@@ -233,28 +237,51 @@ func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, namespac
 		)
 	}
 
-	// Get RulerAction resource from searchRule resource
-	ruleActionNamespacedName := types.NamespacedName{
-		Namespace: searchRule.Spec.ActionRef.Namespace,
-		Name:      searchRule.Spec.ActionRef.Name,
+	gvr := schema.GroupVersionResource{
+		Group:    v1alpha1.GroupVersion.Group,
+		Version:  v1alpha1.GroupVersion.Version,
+		Resource: "clusterruleractions",
 	}
 
-	switch resourceType {
-	case controller.ClusterRulerActionResourceType:
-		err = r.Get(ctx, ruleActionNamespacedName, ruleAction.ClusterRulerActionResource)
-	default:
-		err = r.Get(ctx, ruleActionNamespacedName, ruleAction.RulerActionResource)
+	rulerActionWrapper := globals.Application.KubeRawClient.Resource(gvr)
+	if searchRule.Spec.ActionRef.Namespace != "" {
+		gvr.Resource = "ruleractions"
+		rulerActionWrapper = globals.Application.KubeRawClient.Resource(gvr)
+		rulerActionWrapper.Namespace(searchRule.Spec.ActionRef.Namespace)
 	}
+
+	rulerActionResource, err := rulerActionWrapper.Get(ctx, searchRule.Spec.ActionRef.Name, metav1.GetOptions{})
 	if err != nil {
-		return ruleAction, fmt.Errorf(
+		// TODO: Improve this
+		return err
+	}
+
+	// If RulerAction is empty then error
+	if reflect.ValueOf(rulerActionResource).IsZero() {
+		return fmt.Errorf(
 			"error fetching RulerAction %s from searchRule %s: %v",
-			ruleActionNamespacedName,
+			searchRule.Spec.ActionRef.Name,
 			searchRuleNamespacedName,
 			err,
 		)
 	}
 
-	return ruleAction, nil
+	// Tricky for save RulerAction resource with RulerAction or ClusterRulerAction type
+	specBytes, err := json.Marshal(rulerActionResource.Object)
+	if err != nil {
+		return fmt.Errorf(controller.JSONMarshalErrorMessage, err)
+	}
+	switch searchRule.Spec.ActionRef.Namespace {
+	case "":
+		err = json.Unmarshal(specBytes, ruleAction.ClusterRulerActionResource)
+	default:
+		err = json.Unmarshal(specBytes, ruleAction.RulerActionResource)
+	}
+	if err != nil {
+		return fmt.Errorf(controller.JSONMarshalErrorMessage, err)
+	}
+
+	return nil
 }
 
 // getRulerActionAssociatedAlerts returns all alerts associated with the RulerAction
