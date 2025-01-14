@@ -19,7 +19,6 @@ package ruleraction
 import (
 	"context"
 	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -81,7 +80,7 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// 1.1 Try with Event resource first. If it is not an Event, then it will return an error
 	// but reconcile will try if it is a RulerAction resource relationated with an Event
-	err = r.GetEventRuleAction(ctx, CompoundRulerActionResource, req.Namespace, req.Name)
+	resourceType, err = r.GetEventRuleAction(ctx, CompoundRulerActionResource, req.Namespace, req.Name)
 	if err == nil {
 		goto processEvent
 	}

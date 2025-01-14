@@ -204,7 +204,7 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *CompoundRule
 }
 
 // GetRuleActionFromEvent returns the RulerAction resource associated with the event that triggered the reconcile
-func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, ruleAction *CompoundRulerActionResource, namespace, name string) (err error) {
+func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, ruleAction *CompoundRulerActionResource, namespace, name string) (resourceType string, err error) {
 
 	// Get event resource from the namespace and name of the event that triggered the reconcile
 	EventResource := &corev1.Event{}
@@ -214,7 +214,7 @@ func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, ruleActi
 	}
 	err = r.Get(ctx, namespacedName, EventResource)
 	if err != nil {
-		return fmt.Errorf(
+		return resourceType, fmt.Errorf(
 			"reconcile not triggered by event, triggered by resource %s : %v",
 			namespacedName,
 			err.Error(),
@@ -229,7 +229,7 @@ func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, ruleActi
 	}
 	err = r.Get(ctx, searchRuleNamespacedName, searchRule)
 	if err != nil {
-		return fmt.Errorf(
+		return resourceType, fmt.Errorf(
 			"error fetching SearchRule %s from event %s: %v",
 			searchRuleNamespacedName,
 			namespacedName,
@@ -253,12 +253,12 @@ func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, ruleActi
 	rulerActionResource, err := rulerActionWrapper.Get(ctx, searchRule.Spec.ActionRef.Name, metav1.GetOptions{})
 	if err != nil {
 		// TODO: Improve this
-		return err
+		return resourceType, err
 	}
 
 	// If RulerAction is empty then error
 	if reflect.ValueOf(rulerActionResource).IsZero() {
-		return fmt.Errorf(
+		return resourceType, fmt.Errorf(
 			"error fetching RulerAction %s from searchRule %s: %v",
 			searchRule.Spec.ActionRef.Name,
 			searchRuleNamespacedName,
@@ -269,19 +269,21 @@ func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, ruleActi
 	// Tricky for save RulerAction resource with RulerAction or ClusterRulerAction type
 	specBytes, err := json.Marshal(rulerActionResource.Object)
 	if err != nil {
-		return fmt.Errorf(controller.JSONMarshalErrorMessage, err)
+		return resourceType, fmt.Errorf(controller.JSONMarshalErrorMessage, err)
 	}
 	switch searchRule.Spec.ActionRef.Namespace {
 	case "":
+		resourceType = controller.ClusterRulerActionResourceType
 		err = json.Unmarshal(specBytes, ruleAction.ClusterRulerActionResource)
 	default:
+		resourceType = controller.RulerActionResourceType
 		err = json.Unmarshal(specBytes, ruleAction.RulerActionResource)
 	}
 	if err != nil {
-		return fmt.Errorf(controller.JSONMarshalErrorMessage, err)
+		return resourceType, fmt.Errorf(controller.JSONMarshalErrorMessage, err)
 	}
 
-	return nil
+	return resourceType, nil
 }
 
 // getRulerActionAssociatedAlerts returns all alerts associated with the RulerAction
