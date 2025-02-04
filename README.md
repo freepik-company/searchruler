@@ -62,14 +62,16 @@ resources:
 Some configuration parameters can be defined by flags that can be passed to the controller.
 They are described in the following table:
 
-| Name                                   | Description                                                                    |        Default         |
-|:---------------------------------------|:-------------------------------------------------------------------------------|:----------------------:|
-| `--metrics-bind-address`               | The address the metric endpoint binds to. </br> 0 disables the server          |          `0`           |
-| `--health-probe-bind-address`          | he address the probe endpoint binds to                                         |        `:8081`         |
-| `--leader-elect`                       | Enable leader election for controller manager                                  |        `false`         |
-| `--metrics-secure`                     | If set the metrics endpoint is served securely                                 |        `false`         |
-| `--enable-http2`                       | If set, HTTP/2 will be enabled for the metrirs                                 |        `false`         |
-| `--webserver-address`                  | Webserver listen address.  </br> 0 disables the webserver                      |          `0`           |
+| Name                           | Description                                                                  | Default |
+|:-------------------------------|:-----------------------------------------------------------------------------|:-------:|
+| `--metrics-bind-address`       | The address the metric endpoint binds to. </br> 0 disables the server        |   `0`   |
+| `--health-probe-bind-address`  | he address the probe endpoint binds to                                       | `:8081` |
+| `--leader-elect`               | Enable leader election for controller manager                                | `false` |
+| `--metrics-secure`             | If set the metrics endpoint is served securely                               | `false` |
+| `--enable-http2`               | If set, HTTP/2 will be enabled for the metrics                               | `false` |
+| `--webserver-address`          | Webserver listen address.  </br> 0 disables the webserver                    |   `0`   |
+| `--rules-metrics-bind-address` | The address the custom metric endpoint binds to. </br> 0 disables the server | `false` |
+| `--rules-metrics-refresh-rate` | Refresh rate of the custom metrics.                                          |  `10`   |
 
 
 ## Examples
@@ -275,6 +277,30 @@ spec:
       {{ printf "Name: %s" $object.Name }}
       {{ printf "Description: %s" $object.Spec.Description }}
       {{ printf "Current value: %v" $value }}
+
+   # Custom metrics to extract from the elasticsearch response
+   # Just support for gauge custom metrics yet.
+  customMetrics:
+     # Custom metric name to create in the Prometheus server
+     - name: "searchrule_custom_metric"
+        # Custom metric help description
+       help: "Custom metric help description 2"
+        # Aggregations to extract the custom metric value from the elasticsearch response
+        # It must be a map with at least 2 values, the key and the value or doc_count
+        # GJson path to the aggregation value
+       aggregation_map: "last_15_days.buckets.0.status_codes.buckets"
+        # Custom metric labels
+       labels:
+          - name: "ip"
+            value: "key"
+          - name: "test"
+            value: "doc_count"
+          - name: "static_label"
+            value: "static_value"
+             # If the value is a static value not got from aggregation_map, set the staticValue field to true
+            staticValue: true
+        # Custom metric value to extract from the elasticsearch response
+       value: "doc_count"
 ```
 >[!TIP]
 > Underhood searchrule uses in `conditionField` field `GJson` library, so you can use whatever expression you
@@ -379,7 +405,7 @@ spec:
     # It will be appended to <URL>/<index>/_search endpoint
     index: "kibana_sample_data_logs"
 
-    Another example for queries with aggregations
+    # Another example for queries with aggregations
     query:
       _source: [""]
       query:

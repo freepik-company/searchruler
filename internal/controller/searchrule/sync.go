@@ -48,10 +48,10 @@ import (
 const (
 
 	// Rule states
-	ruleNormalState          = "Normal"
-	ruleFiringState          = "Firing"
-	rulePendingFiringState   = "PendingFiring"
-	rulePendingResolvedState = "PendingResolving"
+	RuleNormalState          = "Normal"
+	RuleFiringState          = "Firing"
+	RulePendingFiringState   = "PendingFiring"
+	RulePendingResolvedState = "PendingResolving"
 
 	// Conditions
 	conditionGreaterThan        = "greaterThan"
@@ -268,9 +268,10 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 		rule = &pools.Rule{
 			SearchRule:    *resource,
 			FiringTime:    time.Time{},
-			State:         ruleNormalState,
+			State:         RuleNormalState,
 			ResolvingTime: time.Time{},
 			Value:         conditionValue.Float(),
+			Aggregations:  nil,
 		}
 		r.RulesPool.Set(ruleKey, rule)
 	}
@@ -283,21 +284,22 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 
 	// Set the current value of the condition to the rule
 	rule.Value = conditionValue.Float()
+	rule.Aggregations = aggregationsResource
 	r.RulesPool.Set(ruleKey, rule)
 
 	// If rule is firing right now
 	if firing {
 
 		// If rule is not set as firing in the pool, set start fireTime and state PendingFiring
-		if rule.State == ruleNormalState || rule.State == rulePendingResolvedState {
+		if rule.State == RuleNormalState || rule.State == RulePendingResolvedState {
 			rule.FiringTime = time.Now()
-			rule.State = rulePendingFiringState
+			rule.State = RulePendingFiringState
 			r.RulesPool.Set(ruleKey, rule)
 		}
 
 		// If rule is firing the For time and it is not notified yet, do it and change state to Firing
 		if time.Since(rule.FiringTime) > forDuration {
-			rule.State = ruleFiringState
+			rule.State = RuleFiringState
 			r.RulesPool.Set(ruleKey, rule)
 
 			// Add alert to the pool with the value, the object and the rulerAction name which will trigger the alert
@@ -338,11 +340,11 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 	}
 
 	// If alert is not firing right now and it is not in healthy state
-	if !firing && rule.State != ruleNormalState {
+	if !firing && rule.State != RuleNormalState {
 
 		// If rule is not marked as resolving in the pool, change state to PendingResolved and set resolvingTime now
-		if rule.State != rulePendingResolvedState {
-			rule.State = rulePendingResolvedState
+		if rule.State != RulePendingResolvedState {
+			rule.State = RulePendingResolvedState
 			rule.ResolvingTime = time.Now()
 			r.RulesPool.Set(ruleKey, rule)
 		}
@@ -357,10 +359,11 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 			// Restore rule to default values
 			rule = &pools.Rule{
 				FiringTime:    time.Time{},
-				State:         ruleNormalState,
+				State:         RuleNormalState,
 				ResolvingTime: time.Time{},
 				SearchRule:    *resource,
 				Value:         conditionValue.Float(),
+				Aggregations:  aggregationsResource,
 			}
 			r.RulesPool.Set(ruleKey, rule)
 

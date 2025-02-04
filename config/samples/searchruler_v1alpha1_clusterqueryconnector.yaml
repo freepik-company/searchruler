@@ -24,7 +24,7 @@ spec:
     #syncInterval: 1m
 
     secretRef:
-      name: elasticsearch-main-credentials
+      name: elastic-main-creds
       namespace: default
       keyUsername: username
       keyPassword: password

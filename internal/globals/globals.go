@@ -47,8 +47,6 @@ const (
 	// Alert firing and resolved status messages
 	ConditionReasonAlertFiring                 = "AlertFiring"
 	ConditionReasonAlertFiringMessage          = "Alert is firing"
-	ConditionReasonAlertResolved               = "AlertResolved"
-	ConditionReasonAlertResolvedMessage        = "Alert is resolved"
 	ConditionReasonPendingAlertFiringMessage   = "Pending alert firing"
 	ConditionReasonPendingAlertFiring          = "PendingAlertFiring"
 	ConditionReasonPendingAlertResolvedMessage = "Pending alert resolved"
