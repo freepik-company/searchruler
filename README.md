@@ -513,6 +513,74 @@ Templating issues are thrown on controller logs, but you also can see the `State
 To debug templates easy, we recommend using [helm-playground](https://helm-playground.com). 
 You can create a template on the left side, put your manifests in the middle, and the result is shown on the right side.
 
+## Metrics
+
+With the custom metrics feature flag enabled (`--rules-metrics-bind-address` and `--rules-metrics-refresh-rate`) a
+Prometheus metrics server will be available to scrape default metrics and the custom metrics defined in the 
+`SearchRule` manifest.
+
+### Default metrics
+Default metrics are the following:
+* `searchrule_value`: The value of the condition field of the `SearchRule` manifest.
+* `searchrule_state`: The state of the `SearchRule` manifest.
+```
+# HELP searchrule_state State of the search rule
+# TYPE searchrule_state gauge
+searchrule_state{rule="searchrule-sample",state="Firing"} 0
+searchrule_state{rule="searchrule-sample",state="Normal"} 0
+searchrule_state{rule="searchrule-sample",state="PendingFiring"} 1
+searchrule_state{rule="searchrule-sample",state="PendingResolving"} 0
+# HELP searchrule_value Value of the search rule
+# TYPE searchrule_value gauge
+searchrule_value{rule="searchrule-sample"} 3401
+```
+
+### Custom metrics
+Custom metrics are the metrics defined in the `SearchRule` manifest. The metrics are defined in the `customMetrics` field
+of the `SearchRule` manifest. The metrics are defined with the following fields:
+* `name`: The name of the custom metric.
+* `help`: The help description of the custom metric.
+* `aggregation_map`: The GJson path to the aggregation value.
+* `labels`: The labels of the custom metric.
+* `value`: The value of the custom metric.
+* `staticValue`: If the value is a static value not got from `aggregation_map`, set the `staticValue` field to `true`.
+
+Example:
+```yaml
+   # Custom metrics to extract from the elasticsearch response
+   # Just support for gauge custom metrics yet.
+  customMetrics:
+     # Custom metric name to create in the Prometheus server
+     - name: "searchrule_custom_metric"
+        # Custom metric help description
+       help: "Custom metric help description 2"
+        # Aggregations to extract the custom metric value from the elasticsearch response
+        # It must be a map with at least 2 values, the key and the value or doc_count
+        # GJson path to the aggregation value
+       aggregation_map: "last_15_days.buckets.0.status_codes.buckets"
+        # Custom metric labels
+       labels:
+          - name: "ip"
+            value: "key"
+          - name: "test"
+            value: "doc_count"
+          - name: "static_label"
+            value: "static_value"
+             # If the value is a static value not got from aggregation_map, set the staticValue field to true
+            staticValue: true
+        # Custom metric value to extract from the elasticsearch response
+       value: "doc_count"
+```
+
+Output:
+```
+# HELP searchrule_custom_metric Custom metric help description 2
+# TYPE searchrule_custom_metric gauge
+searchrule_custom_metric{ip="200",static_label="static_value",test="3401"} 3401
+searchrule_custom_metric{ip="404",static_label="static_value",test="175"} 175
+searchrule_custom_metric{ip="503",static_label="static_value",test="112"} 112
+```
+
 ## How to develop
 
 ### Prerequisites
