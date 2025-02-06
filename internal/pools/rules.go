@@ -30,6 +30,7 @@ type Rule struct {
 	ResolvingTime time.Time
 	State         string
 	Value         float64
+	Aggregations  interface{}
 }
 
 // RulesStore

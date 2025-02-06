@@ -21,9 +21,6 @@ import (
 	"crypto/tls"
 	"flag"
 	"os"
-	"prosimcorp.com/SearchRuler/internal/controller/queryconnector"
-	"prosimcorp.com/SearchRuler/internal/controller/ruleraction"
-	"prosimcorp.com/SearchRuler/internal/controller/searchrule"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -40,7 +37,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
+	"prosimcorp.com/SearchRuler/internal/controller/queryconnector"
+	"prosimcorp.com/SearchRuler/internal/controller/ruleraction"
+	"prosimcorp.com/SearchRuler/internal/controller/searchrule"
 	"prosimcorp.com/SearchRuler/internal/globals"
+	"prosimcorp.com/SearchRuler/internal/metrics"
 	"prosimcorp.com/SearchRuler/internal/pools"
 	"prosimcorp.com/SearchRuler/internal/webserver"
 	// +kubebuilder:scaffold:imports
@@ -76,6 +77,8 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var webserverAddr string
+	var rulesMetricsAddr string
+	var rulesMetricsRefreshSec int
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -88,7 +91,11 @@ func main() {
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.StringVar(&webserverAddr, "webserver-address", "0",
-		"The address the webserver will bind to. Use :8443 for HTTPS or :8080 for HTTP or leave as 0 to disable the webserver.")
+		"The address the webserver will bind to. Leave as 0 to disable the webserver.")
+	flag.StringVar(&rulesMetricsAddr, "rules-metrics-bind-address", "0",
+		"The address the rules custom metrics will bind to. Leave as 0 to disable the rule metrics server.")
+	flag.IntVar(&rulesMetricsRefreshSec, "rules-metrics-refresh-rate", 10,
+		"The refresh rate in seconds for the rules custom metrics.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -168,6 +175,16 @@ func main() {
 		// Create webserver for the application
 		go func() {
 			webserver.RunWebserver(context.TODO(), webserverAddr, RulesPool)
+		}()
+	}
+
+	if rulesMetricsAddr != "0" {
+		// Create rules metrics server
+		go func() {
+			err = metrics.Run(context.TODO(), rulesMetricsAddr, RulesPool, rulesMetricsRefreshSec)
+			if err != nil {
+				setupLog.Error(err, "unable to set up metrics server")
+			}
 		}()
 	}
 

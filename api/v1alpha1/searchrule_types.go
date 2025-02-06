@@ -51,6 +51,22 @@ type QueryConnectorRef struct {
 	Namespace string `json:"namespace"`
 }
 
+// MetricLabels TODO
+type MetricLabel struct {
+	Name        string `json:"name"`
+	Value       string `json:"value"`
+	StaticValue bool   `json:"staticValue,omitempty"`
+}
+
+// CustomMetric TODO
+type CustomMetric struct {
+	Name           string        `json:"name"`
+	Help           string        `json:"help"`
+	AggregationMap string        `json:"aggregation_map"`
+	Labels         []MetricLabel `json:"labels,omitempty"`
+	Value          string        `json:"value"`
+}
+
 // SearchRuleSpec defines the desired state of SearchRule.
 type SearchRuleSpec struct {
 	Description       string            `json:"description,omitempty"`
@@ -59,6 +75,7 @@ type SearchRuleSpec struct {
 	Elasticsearch     Elasticsearch     `json:"elasticsearch"`
 	Condition         Condition         `json:"condition"`
 	ActionRef         ActionRef         `json:"actionRef"`
+	CustomMetrics     []CustomMetric    `json:"customMetrics,omitempty"`
 }
 
 // SearchRuleStatus defines the observed state of SearchRule.

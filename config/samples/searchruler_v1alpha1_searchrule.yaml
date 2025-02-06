@@ -18,7 +18,7 @@ spec:
 
   # Interval time for checking the value of the query. For example, every 30s we will
   # execute the query value to elasticsearch
-  checkInterval: 30s
+  checkInterval: 15s
 
   # Elasticsearch configuration for the query execution.
   # Just elasticsearch is implemented yet.
@@ -32,14 +32,14 @@ spec:
     # Normally it is a JSON query, but we are using YAML format for the manifest ;D
     # so please, transform your JSON query to YAML in the manifest.
     # This option will execute the query: {"_source": [""], "query": { "bool": { "must": [ { "range": { "response": { "gte": 499 } } } ] } } }
-    query:
-      _source: [""]
-      query: 
-        bool:
-          must:
-            - range:
-                response:
-                  gte: 499
+    #query:
+    #  _source: [""]
+    #  query:
+    #    bool:
+    #      must:
+    #        - range:
+    #            response:
+    #              gte: 499
 
     # Okay, if you don't like YAML format, you can use the queryJSON field to put the JSON query
     # directly in the manifest. It will be parsed to the query field. But, if you use both fields,
@@ -66,27 +66,25 @@ spec:
     # returns a JSON response like:
     # { "hits": "total": { "value": 100 }, hits: [ ... ] }
     # hits.total.value checks the total hits of the query
-    conditionField: "hits.total.value"
+    #conditionField: "hits.total.value"
 
     
     # Another example for queries with aggregations
-    # query:
-    #   _source: [""]
-    #   query:
-    #     bool:
-    #       must:
-    #         - range:
-    #             upstream_response_time_f:
-    #               gte: 5
-    #         - range:
-    #             timestamp:
-    #               gte: "now-5m/m"
-    #               lte: "now/m"
-    #     aggs:
-    #       average_response_time:
-    #         avg:
-    #           field: "upstream_response_time_f"
-    # conditionField: "aggregations.average_response_time.value"
+    query:
+      size: 0
+      aggs:
+        last_15_days:
+          date_range:
+            field: timestamp
+            ranges:
+              - from: "now-15d/d"
+                to: "now"
+          aggs:
+            status_codes:
+              terms:
+                field: response.keyword
+
+    conditionField: "aggregations.last_15_days.buckets.0.status_codes.buckets.0.doc_count"
 
   # Condition for the rule evaluation. It will check the conditionField value with the
   # operator and threshold. If the condition is true, the RuleAction will be executed.
@@ -96,7 +94,7 @@ spec:
     # Threshold value to check the condition
     threshold: "100"
     # Time window to check the condition. For example, if the condition is greaterThan 100 for 1m
-    for: "1m"
+    for: "15s"
 
   # RuleAction reference to execute when the condition is true.
   actionRef:
@@ -115,3 +113,27 @@ spec:
       {{ printf "Name: %s" $object.Name }}
       {{ printf "Description: %s" $object.Spec.Description }}
       {{ printf "Current value: %v" $value }}
+
+  # Custom metrics to extract from the elasticsearch response
+  # Just support for gauge custom metrics yet.
+  customMetrics:
+    # Custom metric name to create in the Prometheus server
+    - name: "searchrule_custom_metric"
+      # Custom metric help description
+      help: "Custom metric help description 2"
+      # Aggregations to extract the custom metric value from the elasticsearch response
+      # It must be a map with at least 2 values, the key and the value or doc_count
+      # GJson path to the aggregation value
+      aggregation_map: "last_15_days.buckets.0.status_codes.buckets"
+      # Custom metric labels
+      labels:
+        - name: "ip"
+          value: "key"
+        - name: "test"
+          value: "doc_count"
+        - name: "static_label"
+          value: "static_value"
+          # If the value is a static value not got from aggregation_map, set the staticValue field to true
+          staticValue: true
+      # Custom metric value to extract from the elasticsearch response
+      value: "doc_count"
