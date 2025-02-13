@@ -61,6 +61,7 @@ var (
 
 	// Default rule metrics
 	defaultRuleMetrics = map[string]*prometheus.GaugeVec{}
+	customRuleMetrics  = map[string]*prometheus.GaugeVec{}
 
 	// Prometheus registry
 	prometheusRegistry = *prometheus.NewRegistry()
@@ -157,13 +158,15 @@ func updateMetrics(rulesPool *pools.RulesStore) (err error) {
 				}
 
 				// Create the metric with the labels
-				metric := prometheus.NewGaugeVec(
-					prometheus.GaugeOpts{
-						Name: customMetric.Name,
-						Help: customMetric.Help,
-					},
-					labelKeys,
-				)
+				if _, exists := customRuleMetrics[customMetric.Name]; !exists {
+					customRuleMetrics[customMetric.Name] = prometheus.NewGaugeVec(
+						prometheus.GaugeOpts{
+							Name: customMetric.Name,
+							Help: customMetric.Help,
+						},
+						labelKeys,
+					)
+				}
 
 				// If the metric is registered in the old metrics, check if it has changed
 				if oldRuleMetrics[customMetric.Name] != nil {
@@ -199,7 +202,7 @@ func updateMetrics(rulesPool *pools.RulesStore) (err error) {
 				}
 
 				// Register the metric if it's not already registered
-				if err := prometheusRegistry.Register(metric); err != nil {
+				if err := prometheusRegistry.Register(customRuleMetrics[customMetric.Name]); err != nil {
 					if _, ok := err.(prometheus.AlreadyRegisteredError); !ok {
 						return fmt.Errorf("failed to register metric: %w", err)
 					}
@@ -224,7 +227,7 @@ func updateMetrics(rulesPool *pools.RulesStore) (err error) {
 						return fmt.Errorf("failed to get labels and value: %w", err)
 					}
 
-					metric.WithLabelValues(labels...).Set(value)
+					customRuleMetrics[customMetric.Name].WithLabelValues(labels...).Set(value)
 				}
 			}
 		}
