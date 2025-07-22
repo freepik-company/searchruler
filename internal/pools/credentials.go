@@ -22,6 +22,9 @@ import "sync"
 type Credentials struct {
 	Username string
 	Password string
+	CA       string
+	Cert     string
+	Key      string
 }
 
 // CredentialsStore

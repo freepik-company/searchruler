@@ -1,4 +1,4 @@
-apiVersion: searchruler.prosimcorp.com/v1alpha1
+apiVersion: searchruler.freepik.com/v1alpha1
 kind: RulerAction
 metadata:
   labels:
@@ -6,6 +6,9 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: ruleraction-sample
 spec:
+
+  # Sync interval to send the webhook message. Default is 15s.
+  # syncInterval: 5s
 
   # Webhook integration configuration to send alerts.
   # Note: The webhook integration is the only one implemented yet.

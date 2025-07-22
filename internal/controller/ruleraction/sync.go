@@ -20,13 +20,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"net/http"
-	"prosimcorp.com/SearchRuler/internal/globals"
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,11 +30,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	//
-	"prosimcorp.com/SearchRuler/api/v1alpha1"
-	"prosimcorp.com/SearchRuler/internal/controller"
-	"prosimcorp.com/SearchRuler/internal/pools"
-	"prosimcorp.com/SearchRuler/internal/template"
-	"prosimcorp.com/SearchRuler/internal/validators"
+	"freepik.com/searchruler/api/v1alpha1"
+	"freepik.com/searchruler/internal/controller"
+	"freepik.com/searchruler/internal/pools"
+	"freepik.com/searchruler/internal/template"
+	"freepik.com/searchruler/internal/validators"
 )
 
 var (
@@ -121,6 +117,8 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *CompoundRule
 			return fmt.Errorf(controller.HttpRequestCreationErrorMessage, err)
 		}
 
+		defer httpRequest.Body.Close()
+
 		// Add headers to the request if set
 		httpRequest.Header.Set("Content-Type", "application/json")
 		for headerKey, headerValue := range resourceSpec.Webhook.Headers {
@@ -193,97 +191,14 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *CompoundRule
 				r.UpdateConditionConnectionError(resource, resourceType)
 				return fmt.Errorf(controller.HttpRequestSendingErrorMessage, err)
 			}
-
 			defer httpResponse.Body.Close()
+
 		}
 	}
 
 	// Updates status to Success
 	r.UpdateStateSuccess(resource, resourceType)
 	return nil
-}
-
-// GetRuleActionFromEvent returns the RulerAction resource associated with the event that triggered the reconcile
-func (r *RulerActionReconciler) GetEventRuleAction(ctx context.Context, ruleAction *CompoundRulerActionResource, namespace, name string) (resourceType string, err error) {
-
-	// Get event resource from the namespace and name of the event that triggered the reconcile
-	EventResource := &corev1.Event{}
-	namespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      name,
-	}
-	err = r.Get(ctx, namespacedName, EventResource)
-	if err != nil {
-		return resourceType, fmt.Errorf(
-			"reconcile not triggered by event, triggered by resource %s : %v",
-			namespacedName,
-			err.Error(),
-		)
-	}
-
-	// Get SearchRule resource from event resource
-	searchRule := &v1alpha1.SearchRule{}
-	searchRuleNamespacedName := types.NamespacedName{
-		Namespace: EventResource.InvolvedObject.Namespace,
-		Name:      EventResource.InvolvedObject.Name,
-	}
-	err = r.Get(ctx, searchRuleNamespacedName, searchRule)
-	if err != nil {
-		return resourceType, fmt.Errorf(
-			"error fetching SearchRule %s from event %s: %v",
-			searchRuleNamespacedName,
-			namespacedName,
-			err,
-		)
-	}
-
-	gvr := schema.GroupVersionResource{
-		Group:    v1alpha1.GroupVersion.Group,
-		Version:  v1alpha1.GroupVersion.Version,
-		Resource: "clusterruleractions",
-	}
-
-	rulerActionWrapper := globals.Application.KubeRawClient.Resource(gvr)
-	if searchRule.Spec.ActionRef.Namespace != "" {
-		gvr.Resource = "ruleractions"
-		rulerActionWrapper = globals.Application.KubeRawClient.Resource(gvr)
-		rulerActionWrapper.Namespace(searchRule.Spec.ActionRef.Namespace)
-	}
-
-	rulerActionResource, err := rulerActionWrapper.Get(ctx, searchRule.Spec.ActionRef.Name, metav1.GetOptions{})
-	if err != nil {
-		// TODO: Improve this
-		return resourceType, err
-	}
-
-	// If RulerAction is empty then error
-	if reflect.ValueOf(rulerActionResource).IsZero() {
-		return resourceType, fmt.Errorf(
-			"error fetching RulerAction %s from searchRule %s: %v",
-			searchRule.Spec.ActionRef.Name,
-			searchRuleNamespacedName,
-			err,
-		)
-	}
-
-	// Tricky for save RulerAction resource with RulerAction or ClusterRulerAction type
-	specBytes, err := json.Marshal(rulerActionResource.Object)
-	if err != nil {
-		return resourceType, fmt.Errorf(controller.JSONMarshalErrorMessage, err)
-	}
-	switch searchRule.Spec.ActionRef.Namespace {
-	case "":
-		resourceType = controller.ClusterRulerActionResourceType
-		err = json.Unmarshal(specBytes, ruleAction.ClusterRulerActionResource)
-	default:
-		resourceType = controller.RulerActionResourceType
-		err = json.Unmarshal(specBytes, ruleAction.RulerActionResource)
-	}
-	if err != nil {
-		return resourceType, fmt.Errorf(controller.JSONMarshalErrorMessage, err)
-	}
-
-	return resourceType, nil
 }
 
 // getRulerActionAssociatedAlerts returns all alerts associated with the RulerAction

@@ -34,9 +34,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	//
-	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
-	"prosimcorp.com/SearchRuler/internal/controller"
-	"prosimcorp.com/SearchRuler/internal/pools"
+	searchrulerv1alpha1 "freepik.com/searchruler/api/v1alpha1"
+	"freepik.com/searchruler/internal/controller"
+	"freepik.com/searchruler/internal/pools"
 )
 
 // QueryConnectorReconciler reconciles a QueryConnector object
@@ -56,9 +56,9 @@ var (
 	containsFinalizer bool
 )
 
-// +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=queryconnectors,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=queryconnectors/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=queryconnectors/finalizers,verbs=update
+// +kubebuilder:rbac:groups=searchruler.freepik.com,resources=queryconnectors,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=searchruler.freepik.com,resources=queryconnectors/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=searchruler.freepik.com,resources=queryconnectors/finalizers,verbs=update
 
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
@@ -98,7 +98,7 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return result, err
 	}
 
-	// 3. Check if the SearchRule instance is marked to be deleted: indicated by the deletion timestamp being set
+	// 3. Check if the QueryConnector or ClusterQueryConnector instance is marked to be deleted: indicated by the deletion timestamp being set
 	deletionTimestamp := &v1.Time{}
 	switch resourceType {
 	case controller.ClusterQueryConnectorResourceType:
@@ -133,7 +133,7 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return result, err
 	}
 
-	// 4. Add finalizer to the SearchRule CR
+	// 4. Add finalizer to the QueryConnector or ClusterQueryConnector CR
 	if !containsFinalizer {
 		switch resourceType {
 		case controller.ClusterQueryConnectorResourceType:
@@ -165,12 +165,12 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	syncInterval := controller.DefaultSyncInterval
 	switch resourceType {
 	case controller.ClusterQueryConnectorResourceType:
-		if !reflect.ValueOf(CompoundQueryConnectorResource.ClusterQueryConnectorResource.Spec.Credentials.SyncInterval).IsZero() {
-			syncInterval = CompoundQueryConnectorResource.ClusterQueryConnectorResource.Spec.Credentials.SyncInterval
+		if !reflect.ValueOf(CompoundQueryConnectorResource.ClusterQueryConnectorResource.Spec.SyncInterval).IsZero() {
+			syncInterval = CompoundQueryConnectorResource.ClusterQueryConnectorResource.Spec.SyncInterval
 		}
 	default:
-		if !reflect.ValueOf(CompoundQueryConnectorResource.QueryConnectorResource.Spec.Credentials.SyncInterval).IsZero() {
-			syncInterval = CompoundQueryConnectorResource.QueryConnectorResource.Spec.Credentials.SyncInterval
+		if !reflect.ValueOf(CompoundQueryConnectorResource.QueryConnectorResource.Spec.SyncInterval).IsZero() {
+			syncInterval = CompoundQueryConnectorResource.QueryConnectorResource.Spec.SyncInterval
 		}
 	}
 
@@ -185,11 +185,13 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// 7. Sync credentials if defined
 	credentials := CompoundQueryConnectorResource.QueryConnectorResource.Spec.Credentials
+	certificates := CompoundQueryConnectorResource.QueryConnectorResource.Spec.Certificates
 	if resourceType == controller.ClusterQueryConnectorResourceType {
 		credentials = CompoundQueryConnectorResource.ClusterQueryConnectorResource.Spec.Credentials
+		certificates = CompoundQueryConnectorResource.ClusterQueryConnectorResource.Spec.Certificates
 	}
 
-	if !reflect.ValueOf(credentials).IsZero() {
+	if !reflect.ValueOf(credentials).IsZero() && !reflect.ValueOf(certificates).IsZero() {
 		err = r.Sync(ctx, watch.Modified, CompoundQueryConnectorResource, resourceType)
 		if err != nil {
 			r.UpdateConditionKubernetesApiCallFailure(CompoundQueryConnectorResource, resourceType)

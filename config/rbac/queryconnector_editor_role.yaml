@@ -8,7 +8,7 @@ metadata:
   name: queryconnector-editor-role
 rules:
 - apiGroups:
-  - searchruler.prosimcorp.com
+  - searchruler.freepik.com
   resources:
   - queryconnectors
   verbs:
@@ -20,7 +20,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - searchruler.prosimcorp.com
+  - searchruler.freepik.com
   resources:
   - queryconnectors/status
   verbs:

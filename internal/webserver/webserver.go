@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"prosimcorp.com/SearchRuler/internal/pools"
+	"freepik.com/searchruler/internal/pools"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/yaml"
 

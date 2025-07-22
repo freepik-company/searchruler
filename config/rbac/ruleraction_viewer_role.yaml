@@ -8,7 +8,7 @@ metadata:
   name: ruleraction-viewer-role
 rules:
 - apiGroups:
-  - searchruler.prosimcorp.com
+  - searchruler.freepik.com
   resources:
   - ruleractions
   verbs:
@@ -16,7 +16,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - searchruler.prosimcorp.com
+  - searchruler.freepik.com
   resources:
   - ruleractions/status
   verbs:

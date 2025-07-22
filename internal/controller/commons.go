@@ -10,7 +10,8 @@ const (
 	ClusterRulerActionResourceType    = "ClusterRulerAction"
 
 	// Sync interval to check if secrets of SearchRuleAction and SearchRuleQueryConnector are up to date
-	DefaultSyncInterval = "1m"
+	DefaultSyncInterval            = "1m"
+	DefaultSyncIntervalRulerAction = "5s"
 
 	// Error messages
 	ResourceNotFoundError                  = "%s '%s' resource not found. Ignoring since object must be deleted."
@@ -39,7 +40,8 @@ const (
 	EvaluatingConditionErrorMessage        = "error evaluating condition: %v"
 	ForValueParseErrorMessage              = "error parsing `for` time: %v"
 	KubeEventCreationErrorMessage          = "error creating kube event: %v"
+	MissingCertsMessage                    = "missing certificates in secret %s"
 
 	// Finalizer
-	ResourceFinalizer = "searchruler.prosimcorp.com/finalizer"
+	ResourceFinalizer = "searchruler.freepik.com/finalizer"
 )

@@ -4,14 +4,14 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.4
-  name: searchrules.searchruler.prosimcorp.com
+  name: ruleractions.searchruler.freepik.com
 spec:
-  group: searchruler.prosimcorp.com
+  group: searchruler.freepik.com
   names:
-    kind: SearchRule
-    listKind: SearchRuleList
-    plural: searchrules
-    singular: searchrule
+    kind: RulerAction
+    listKind: RulerActionList
+    plural: ruleractions
+    singular: ruleraction
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -19,7 +19,7 @@ spec:
       name: Ready
       type: string
     - jsonPath: .status.conditions[?(@.type=="State")].reason
-      name: AlertStatus
+      name: Status
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
@@ -27,7 +27,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: SearchRule is the Schema for the searchrules API.
+        description: RulerAction is the Schema for the ruleractions API.
         properties:
           apiVersion:
             description: |-
@@ -47,109 +47,56 @@ spec:
           metadata:
             type: object
           spec:
-            description: SearchRuleSpec defines the desired state of SearchRule.
+            description: RulerActionSpec defines the desired state of RulerAction.
             properties:
-              actionRef:
-                description: ActionRef TODO
-                properties:
-                  data:
-                    type: string
-                  name:
-                    type: string
-                  namespace:
-                    type: string
-                required:
-                - data
-                - name
-                - namespace
-                type: object
-              checkInterval:
+              syncInterval:
                 type: string
-              condition:
-                description: Condition TODO
+              webhook:
+                description: WebHook TODO
                 properties:
-                  for:
-                    type: string
-                  operator:
-                    type: string
-                  threshold:
-                    type: string
-                required:
-                - for
-                - operator
-                - threshold
-                type: object
-              customMetrics:
-                items:
-                  description: CustomMetric TODO
-                  properties:
-                    aggregation_map:
-                      type: string
-                    help:
-                      type: string
-                    labels:
-                      items:
-                        description: MetricLabels TODO
+                  credentials:
+                    description: RulerActionCredentials TODO
+                    properties:
+                      secretRef:
+                        description: SecretRef TODO
                         properties:
+                          keyPassword:
+                            type: string
+                          keyUsername:
+                            type: string
                           name:
                             type: string
-                          staticValue:
-                            type: boolean
-                          value:
+                          namespace:
                             type: string
                         required:
+                        - keyPassword
+                        - keyUsername
                         - name
-                        - value
                         type: object
-                      type: array
-                    name:
+                    required:
+                    - secretRef
+                    type: object
+                  headers:
+                    additionalProperties:
                       type: string
-                    value:
-                      type: string
-                  required:
-                  - aggregation_map
-                  - help
-                  - name
-                  - value
-                  type: object
-                type: array
-              description:
-                type: string
-              elasticsearch:
-                description: Elasticsearch TODO
-                properties:
-                  conditionField:
+                    type: object
+                  tlsSkipVerify:
+                    type: boolean
+                  url:
                     type: string
-                  index:
+                  validator:
                     type: string
-                  query:
-                    x-kubernetes-preserve-unknown-fields: true
-                  queryJSON:
+                  verb:
                     type: string
                 required:
-                - conditionField
-                - index
-                type: object
-              queryConnectorRef:
-                description: QueryConnectorRef TODO
-                properties:
-                  name:
-                    type: string
-                  namespace:
-                    type: string
-                required:
-                - name
-                - namespace
+                - url
+                - verb
                 type: object
             required:
-            - actionRef
-            - checkInterval
-            - condition
-            - elasticsearch
-            - queryConnectorRef
+            - webhook
             type: object
           status:
-            description: SearchRuleStatus defines the observed state of SearchRule.
+            description: RulerActionStatus defines the observed state of RulerAction.
             properties:
               conditions:
                 items:

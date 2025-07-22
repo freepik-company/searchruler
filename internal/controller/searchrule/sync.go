@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -39,10 +40,10 @@ import (
 	"github.com/tidwall/gjson"
 
 	//
-	"prosimcorp.com/SearchRuler/api/v1alpha1"
-	"prosimcorp.com/SearchRuler/internal/controller"
-	"prosimcorp.com/SearchRuler/internal/globals"
-	"prosimcorp.com/SearchRuler/internal/pools"
+	"freepik.com/searchruler/api/v1alpha1"
+	"freepik.com/searchruler/internal/controller"
+	"freepik.com/searchruler/internal/globals"
+	"freepik.com/searchruler/internal/pools"
 )
 
 const (
@@ -175,12 +176,36 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 		elasticQuery = []byte(resource.Spec.Elasticsearch.QueryJSON)
 	}
 
+	// Configure TLS settings
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: QueryConnectorSpec.TlsSkipVerify,
+	}
+
+	// Add certificates if set for elasticsearch queries
+	if QueryConnectorSpec.Certificates.SecretRef.Name != "" {
+		// Load client certificates for mTLS
+		cert, err := tls.X509KeyPair([]byte(queryConnectorCreds.Cert), []byte(queryConnectorCreds.Key))
+		if err != nil {
+			r.UpdateConditionConnectionError(resource)
+			return fmt.Errorf("error loading client certificates: %v", err)
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+
+		// Add CA certificate if available for server verification
+		if queryConnectorCreds.CA != "" {
+			caCertPool := x509.NewCertPool()
+			if !caCertPool.AppendCertsFromPEM([]byte(queryConnectorCreds.CA)) {
+				r.UpdateConditionConnectionError(resource)
+				return fmt.Errorf("error loading CA certificate")
+			}
+			tlsConfig.RootCAs = caCertPool
+		}
+	}
+
 	// Make http client for elasticsearch connection
 	httpClient := &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: QueryConnectorSpec.TlsSkipVerify,
-			},
+			TLSClientConfig: tlsConfig,
 		},
 	}
 

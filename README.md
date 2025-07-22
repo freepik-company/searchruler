@@ -1,7 +1,7 @@
-# SearchRuler
+# searchruler
 ### 🔥 Meet searchruler: The Log Alerting Engine You Didn’t Know You Needed!
 
-<img src="https://raw.githubusercontent.com/prosimcorp/searchruler/master/docs/img/logo.png" alt="SearchRuler Logo (Main) logo." width="150">
+<img src="https://raw.githubusercontent.com/prosimcorp/searchruler/master/docs/img/logo.png" alt="searchruler Logo (Main) logo." width="150">
 
 ![GitHub Release](https://img.shields.io/github/v/release/prosimcorp/searchruler)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/prosimcorp/searchruler)
@@ -87,7 +87,7 @@ A `QueryConnector` is where it all starts! It defines the "source" where your lo
 Here’s a quick example to show you how it works:
 
 ```yaml
-apiVersion: searchruler.prosimcorp.com/v1alpha1
+apiVersion: searchruler.freepik.com/v1alpha1
 kind: QueryConnector
 metadata:
   labels:
@@ -126,7 +126,7 @@ A RulerAction defines where your alerts will be sent when a SearchRule is trigge
 
 Here’s a quick example:
 ```yaml
-apiVersion: searchruler.prosimcorp.com/v1alpha1
+apiVersion: searchruler.freepik.com/v1alpha1
 kind: RulerAction
 metadata:
   labels:
@@ -176,7 +176,7 @@ Here are two quick examples to show you what’s possible:
 1️⃣ **Simple Match Count Alert**. Trigger an alert when the number of matching documents exceeds a threshold:
 
 ```yaml
-apiVersion: searchruler.prosimcorp.com/v1alpha1
+apiVersion: searchruler.freepik.com/v1alpha1
 kind: SearchRule
 metadata:
   labels:
@@ -375,7 +375,7 @@ Here’s an example to show how to configure an Alertmanager-compatible message:
 
 2️⃣ **Average Field Value Alert**. Alert if the average value of a field exceeds a limit (e.g., high response times):
 ```yaml
-apiVersion: searchruler.prosimcorp.com/v1alpha1
+apiVersion: searchruler.freepik.com/v1alpha1
 kind: SearchRule
 metadata:
   labels:
@@ -508,7 +508,7 @@ spec:
 
 ### How to debug
 
-Templating issues are thrown on controller logs, but you also can see the `State` of your `SearchRuler` in `EvaluateTemplateError` state if there is any error evaluating the template.
+Templating issues are thrown on controller logs, but you also can see the `State` of your `searchruler` in `EvaluateTemplateError` state if there is any error evaluating the template.
 
 To debug templates easy, we recommend using [helm-playground](https://helm-playground.com). 
 You can create a template on the left side, put your manifests in the middle, and the result is shown on the right side.

@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"prosimcorp.com/SearchRuler/api/v1alpha1"
+	"freepik.com/searchruler/api/v1alpha1"
 )
 
 // Rule
