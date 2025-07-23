@@ -220,6 +220,7 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 		r.UpdateConditionConnectionError(resource)
 		return fmt.Errorf(controller.HttpRequestCreationErrorMessage, err)
 	}
+	defer req.Body.Close()
 
 	// Add headers and custom headers for elasticsearch queries
 	req.Header.Set("Content-Type", "application/json")
