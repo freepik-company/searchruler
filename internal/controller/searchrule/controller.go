@@ -31,9 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	//
-	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
-	"prosimcorp.com/SearchRuler/internal/controller"
-	"prosimcorp.com/SearchRuler/internal/pools"
+	searchrulerv1alpha1 "freepik.com/searchruler/api/v1alpha1"
+	"freepik.com/searchruler/internal/controller"
+	"freepik.com/searchruler/internal/pools"
 )
 
 // SearchRuleReconciler reconciles a SearchRule object
@@ -45,9 +45,9 @@ type SearchRuleReconciler struct {
 	AlertsPool                    *pools.AlertsStore
 }
 
-// +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=searchrules,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=searchrules/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=searchrules/finalizers,verbs=update
+// +kubebuilder:rbac:groups=searchruler.freepik.com,resources=searchrules,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=searchruler.freepik.com,resources=searchrules/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=searchruler.freepik.com,resources=searchrules/finalizers,verbs=update
 
 // +kubebuilder:rbac:groups="events.k8s.io",resources=events,verbs=get;list;watch;create;update;patch
 

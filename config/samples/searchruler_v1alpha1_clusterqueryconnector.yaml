@@ -1,4 +1,4 @@
-apiVersion: searchruler.prosimcorp.com/v1alpha1
+apiVersion: searchruler.freepik.com/v1alpha1
 kind: ClusterQueryConnector
 metadata:
   labels:
@@ -16,15 +16,23 @@ spec:
   # Skip certificate verification if the connection is HTTPS
   tlsSkipVerify: true
 
-  # Secret reference to get the credentials if needed for the connection
-  credentials:
+  # Interval to check secret credentials for any changes
+  # Default value is 1m
+  syncInterval: 15s
 
-    # Interval to check secret credentials for any changes
-    # Default value is 1m
-    #syncInterval: 1m
-
+  # Certificates to use for the connection
+  certificates:
     secretRef:
-      name: elastic-main-creds
+      name: elasticsearch-main-certificates
       namespace: default
-      keyUsername: username
-      keyPassword: password
+      keyCA: ca.crt
+      keyCert: cert.crt
+      keyKey: key.pem
+
+  # Secret reference to get the credentials if needed for the connection
+  # credentials:
+  #   secretRef:
+  #     name: elastic-main-creds
+  #     namespace: default
+  #     keyUsername: username
+  #     keyPassword: password

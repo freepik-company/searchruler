@@ -8,7 +8,7 @@ metadata:
   name: clusterqueryconnector-viewer-role
 rules:
 - apiGroups:
-  - searchruler.prosimcorp.com
+  - searchruler.freepik.com
   resources:
   - clusterqueryconnectors
   verbs:
@@ -16,7 +16,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - searchruler.prosimcorp.com
+  - searchruler.freepik.com
   resources:
   - clusterqueryconnectors/status
   verbs:

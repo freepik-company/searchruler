@@ -1,0 +1,28 @@
+# SearchRuler
+# Ref: https://helm.sh/docs/topics/charts/#the-chartyaml-file
+apiVersion: v2
+name: searchruler
+type: application
+description: >-
+  A Helm chart for SearchRuler, a ruler Engine that allows you 
+  to create and manage rules for your search engine.
+version: 0.5.0 # chart version
+appVersion: "0.5.0" # searchruler version
+kubeVersion: ">=1.22.0-0" # kubernetes version
+home: https://github.com/freepik-company/searchruler
+sources:
+  - https://github.com/freepik-company/searchruler
+keywords:
+  - freepik
+  - prosimcorp
+  - searchruler
+  - gitops
+maintainers:
+  - name: Daniel Fradejas
+    email: fradejasdaniel@gmail.com
+    url: https://github.com/freepik-company/searchruler
+  - name: Alby Hernández
+    email: donfumero@gmail.com
+    url: https://github.com/freepik-company/searchruler
+  - name: prosimcorp
+    url: https://github.com/prosimcorp

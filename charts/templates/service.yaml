@@ -1,0 +1,59 @@
+{{- if and (.Values.controller.metrics.enabled) (.Values.controller.metrics.service.enabled) }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "searchruler.fullname" . }}-metrics
+  labels:
+    {{- include "searchruler.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.controller.metrics.service.type }}
+  ports:
+    - port: {{ .Values.controller.metrics.service.port }}
+      name: metrics
+      protocol: TCP
+      targetPort: metrics
+  selector:
+    {{- include "searchruler.selectorLabels" . | nindent 4 }}
+
+---
+{{- end }}
+
+{{- if and (.Values.controller.webserver.enabled) (.Values.controller.webserver.service.enabled) }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "searchruler.fullname" . }}-webserver
+  labels:
+    {{- include "searchruler.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.controller.webserver.service.type }}
+  ports:
+    - port: {{ .Values.controller.webserver.service.port }}
+      name: webserver
+      protocol: TCP
+      targetPort: webserver
+  selector:
+    {{- include "searchruler.selectorLabels" . | nindent 4 }}
+
+---
+{{- end }}
+
+{{- if and (.Values.controller.customMetrics.enabled) (.Values.controller.customMetrics.service.enabled) }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "searchruler.fullname" . }}-custom-metrics
+  labels:
+    {{- include "searchruler.labels" . | nindent 4 }}
+    {{- .Values.controller.customMetrics.service.labels | toYaml | nindent 4 }}
+spec:
+  type: {{ .Values.controller.customMetrics.service.type }}
+  ports:
+    - port: {{ .Values.controller.customMetrics.service.port }}
+      name: custom-metrics
+      protocol: TCP
+      targetPort: custom-metrics
+  selector:
+    {{- include "searchruler.selectorLabels" . | nindent 4 }}
+
+{{- end }}

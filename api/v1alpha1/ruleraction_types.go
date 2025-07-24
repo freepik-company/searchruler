@@ -37,7 +37,8 @@ type Webhook struct {
 
 // RulerActionSpec defines the desired state of RulerAction.
 type RulerActionSpec struct {
-	Webhook Webhook `json:"webhook"`
+	Webhook      Webhook `json:"webhook"`
+	SyncInterval string  `json:"syncInterval,omitempty"`
 }
 
 // RulerActionStatus defines the observed state of RulerAction.

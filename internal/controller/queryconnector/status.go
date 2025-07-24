@@ -20,8 +20,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	//
-	"prosimcorp.com/SearchRuler/internal/controller"
-	"prosimcorp.com/SearchRuler/internal/globals"
+	"freepik.com/searchruler/internal/controller"
+	"freepik.com/searchruler/internal/globals"
 )
 
 // UpdateConditionSuccess updates the status of the resource with a success condition
@@ -78,6 +78,22 @@ func (r *QueryConnectorReconciler) UpdateConditionNoCredsFound(resource *Compoun
 	// Create the new condition with the success status
 	condition := globals.NewCondition(globals.ConditionTypeState, metav1.ConditionTrue,
 		globals.ConditionReasonNoCredsFoundType, globals.ConditionReasonNoCredsFoundMessage)
+
+	// Update the status of the QueryConnector resource
+	switch resourceType {
+	case controller.ClusterQueryConnectorResourceType:
+		globals.UpdateCondition(&resource.ClusterQueryConnectorResource.Status.Conditions, condition)
+	default:
+		globals.UpdateCondition(&resource.QueryConnectorResource.Status.Conditions, condition)
+	}
+}
+
+// UpdateConditionNoCertsFound updates the status of the resource with a NoCerts condition
+func (r *QueryConnectorReconciler) UpdateConditionNoCertsFound(resource *CompoundQueryConnectorResource, resourceType string) {
+
+	// Create the new condition with the success status
+	condition := globals.NewCondition(globals.ConditionTypeState, metav1.ConditionTrue,
+		globals.ConditionReasonNoCertsFoundType, globals.ConditionReasonNoCertsFoundMessage)
 
 	// Update the status of the QueryConnector resource
 	switch resourceType {

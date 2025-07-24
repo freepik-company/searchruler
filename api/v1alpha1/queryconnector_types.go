@@ -22,16 +22,31 @@ import (
 
 // QueryConnectorCredentials TODO
 type QueryConnectorCredentials struct {
-	SyncInterval string    `json:"syncInterval,omitempty"`
-	SecretRef    SecretRef `json:"secretRef"`
+	SecretRef SecretRef `json:"secretRef"`
+}
+
+// QueryConnectorCertificates TODO
+type QueryConnectorCertificates struct {
+	SecretRef CertificatesSecretRef `json:"secretRef"`
+}
+
+// CertificatesSecretRef TODO
+type CertificatesSecretRef struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace,omitempty"`
+	KeyCA     string `json:"keyCA"`
+	KeyCert   string `json:"keyCert"`
+	KeyKey    string `json:"keyKey"`
 }
 
 // QueryConnectorSpec defines the desired state of QueryConnector.
 type QueryConnectorSpec struct {
-	URL           string                    `json:"url"`
-	Headers       map[string]string         `json:"headers,omitempty"`
-	TlsSkipVerify bool                      `json:"tlsSkipVerify,omitempty"`
-	Credentials   QueryConnectorCredentials `json:"credentials,omitempty"`
+	URL           string                     `json:"url"`
+	Headers       map[string]string          `json:"headers,omitempty"`
+	TlsSkipVerify bool                       `json:"tlsSkipVerify,omitempty"`
+	Credentials   QueryConnectorCredentials  `json:"credentials,omitempty"`
+	SyncInterval  string                     `json:"syncInterval,omitempty"`
+	Certificates  QueryConnectorCertificates `json:"certificates,omitempty"`
 }
 
 // QueryConnectorStatus defines the observed state of QueryConnector.

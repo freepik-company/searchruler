@@ -21,8 +21,8 @@ import (
 
 	//
 
-	"prosimcorp.com/SearchRuler/internal/controller"
-	"prosimcorp.com/SearchRuler/internal/globals"
+	"freepik.com/searchruler/internal/controller"
+	"freepik.com/searchruler/internal/globals"
 )
 
 // UpdateConditionSuccess updates the status of the RulerAction resource with a success condition

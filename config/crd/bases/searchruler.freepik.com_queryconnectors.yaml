@@ -4,14 +4,14 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.4
-  name: searchrules.searchruler.prosimcorp.com
+  name: queryconnectors.searchruler.freepik.com
 spec:
-  group: searchruler.prosimcorp.com
+  group: searchruler.freepik.com
   names:
-    kind: SearchRule
-    listKind: SearchRuleList
-    plural: searchrules
-    singular: searchrule
+    kind: QueryConnector
+    listKind: QueryConnectorList
+    plural: queryconnectors
+    singular: queryconnector
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -19,7 +19,7 @@ spec:
       name: Ready
       type: string
     - jsonPath: .status.conditions[?(@.type=="State")].reason
-      name: AlertStatus
+      name: Status
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
@@ -27,7 +27,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: SearchRule is the Schema for the searchrules API.
+        description: QueryConnector is the Schema for the queryconnectors API.
         properties:
           apiVersion:
             description: |-
@@ -47,109 +47,70 @@ spec:
           metadata:
             type: object
           spec:
-            description: SearchRuleSpec defines the desired state of SearchRule.
+            description: QueryConnectorSpec defines the desired state of QueryConnector.
             properties:
-              actionRef:
-                description: ActionRef TODO
+              certificates:
+                description: QueryConnectorCertificates TODO
                 properties:
-                  data:
-                    type: string
-                  name:
-                    type: string
-                  namespace:
-                    type: string
+                  secretRef:
+                    description: CertificatesSecretRef TODO
+                    properties:
+                      keyCA:
+                        type: string
+                      keyCert:
+                        type: string
+                      keyKey:
+                        type: string
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                    required:
+                    - keyCA
+                    - keyCert
+                    - keyKey
+                    - name
+                    type: object
                 required:
-                - data
-                - name
-                - namespace
+                - secretRef
                 type: object
-              checkInterval:
+              credentials:
+                description: QueryConnectorCredentials TODO
+                properties:
+                  secretRef:
+                    description: SecretRef TODO
+                    properties:
+                      keyPassword:
+                        type: string
+                      keyUsername:
+                        type: string
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                    required:
+                    - keyPassword
+                    - keyUsername
+                    - name
+                    type: object
+                required:
+                - secretRef
+                type: object
+              headers:
+                additionalProperties:
+                  type: string
+                type: object
+              syncInterval:
                 type: string
-              condition:
-                description: Condition TODO
-                properties:
-                  for:
-                    type: string
-                  operator:
-                    type: string
-                  threshold:
-                    type: string
-                required:
-                - for
-                - operator
-                - threshold
-                type: object
-              customMetrics:
-                items:
-                  description: CustomMetric TODO
-                  properties:
-                    aggregation_map:
-                      type: string
-                    help:
-                      type: string
-                    labels:
-                      items:
-                        description: MetricLabels TODO
-                        properties:
-                          name:
-                            type: string
-                          staticValue:
-                            type: boolean
-                          value:
-                            type: string
-                        required:
-                        - name
-                        - value
-                        type: object
-                      type: array
-                    name:
-                      type: string
-                    value:
-                      type: string
-                  required:
-                  - aggregation_map
-                  - help
-                  - name
-                  - value
-                  type: object
-                type: array
-              description:
+              tlsSkipVerify:
+                type: boolean
+              url:
                 type: string
-              elasticsearch:
-                description: Elasticsearch TODO
-                properties:
-                  conditionField:
-                    type: string
-                  index:
-                    type: string
-                  query:
-                    x-kubernetes-preserve-unknown-fields: true
-                  queryJSON:
-                    type: string
-                required:
-                - conditionField
-                - index
-                type: object
-              queryConnectorRef:
-                description: QueryConnectorRef TODO
-                properties:
-                  name:
-                    type: string
-                  namespace:
-                    type: string
-                required:
-                - name
-                - namespace
-                type: object
             required:
-            - actionRef
-            - checkInterval
-            - condition
-            - elasticsearch
-            - queryConnectorRef
+            - url
             type: object
           status:
-            description: SearchRuleStatus defines the observed state of SearchRule.
+            description: QueryConnectorStatus defines the observed state of QueryConnector.
             properties:
               conditions:
                 items:

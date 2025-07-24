@@ -20,8 +20,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	//
-	"prosimcorp.com/SearchRuler/api/v1alpha1"
-	"prosimcorp.com/SearchRuler/internal/globals"
+	"freepik.com/searchruler/api/v1alpha1"
+	"freepik.com/searchruler/internal/globals"
 )
 
 // UpdateConditionSuccess updates the status of the SearchRule resource with a success condition

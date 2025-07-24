@@ -19,7 +19,7 @@ package pools
 import (
 	"sync"
 
-	"prosimcorp.com/SearchRuler/api/v1alpha1"
+	"freepik.com/searchruler/api/v1alpha1"
 )
 
 // Alert

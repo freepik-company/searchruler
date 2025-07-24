@@ -77,6 +77,10 @@ const (
 	// Query error
 	ConditionReasonQueryErrorMessage = "Error executing the query"
 	ConditionReasonQueryErrorType    = "QueryError"
+
+	// No certificates found
+	ConditionReasonNoCertsFoundType    = "NoCertsFound"
+	ConditionReasonNoCertsFoundMessage = "No certificates found in secret"
 )
 
 var (

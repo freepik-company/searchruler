@@ -2,54 +2,54 @@
 # This file is used to track the info used to scaffold your project
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
-domain: prosimcorp.com
+domain: freepik.com
 layout:
 - go.kubebuilder.io/v4
 projectName: search-ruler
-repo: prosimcorp.com/SearchRuler
+repo: freepik.com/searchruler
 resources:
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: prosimcorp.com
+  domain: freepik.com
   group: searchruler
   kind: RulerAction
-  path: prosimcorp.com/SearchRuler/api/v1alpha1
+  path: freepik.com/searchruler/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: prosimcorp.com
+  domain: freepik.com
   group: searchruler
   kind: SearchRule
-  path: prosimcorp.com/SearchRuler/api/v1alpha1
+  path: freepik.com/searchruler/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: prosimcorp.com
+  domain: freepik.com
   group: searchruler
   kind: QueryConnector
-  path: prosimcorp.com/SearchRuler/api/v1alpha1
+  path: freepik.com/searchruler/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: prosimcorp.com
+  domain: freepik.com
   group: searchruler
   kind: ClusterQueryConnector
-  path: prosimcorp.com/SearchRuler/api/v1alpha1
+  path: freepik.com/searchruler/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
     namespaced: true
-  domain: prosimcorp.com
+  domain: freepik.com
   group: searchruler
   kind: ClusterRulerAction
-  path: prosimcorp.com/SearchRuler/api/v1alpha1
+  path: freepik.com/searchruler/api/v1alpha1
   version: v1alpha1
 version: "3"

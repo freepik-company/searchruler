@@ -30,9 +30,9 @@ import (
 	"github.com/tidwall/gjson"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"prosimcorp.com/SearchRuler/api/v1alpha1"
-	"prosimcorp.com/SearchRuler/internal/controller/searchrule"
-	"prosimcorp.com/SearchRuler/internal/pools"
+	"freepik.com/searchruler/api/v1alpha1"
+	"freepik.com/searchruler/internal/controller/searchrule"
+	"freepik.com/searchruler/internal/pools"
 )
 
 type RuleMetricT struct {

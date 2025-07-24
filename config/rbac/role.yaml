@@ -25,7 +25,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - searchruler.prosimcorp.com
+  - searchruler.freepik.com
   resources:
   - queryconnectors
   - ruleractions
@@ -39,7 +39,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - searchruler.prosimcorp.com
+  - searchruler.freepik.com
   resources:
   - queryconnectors/finalizers
   - ruleractions/finalizers
@@ -47,7 +47,7 @@ rules:
   verbs:
   - update
 - apiGroups:
-  - searchruler.prosimcorp.com
+  - searchruler.freepik.com
   resources:
   - queryconnectors/status
   - ruleractions/status

@@ -41,14 +41,14 @@ type Condition struct {
 // ActionRef TODO
 type ActionRef struct {
 	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
+	Namespace string `json:"namespace,omitempty"`
 	Data      string `json:"data"`
 }
 
 // QueryConnectorRef TODO
 type QueryConnectorRef struct {
 	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // MetricLabels TODO

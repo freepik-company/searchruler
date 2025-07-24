@@ -8,7 +8,7 @@ metadata:
   name: clusterruleraction-editor-role
 rules:
 - apiGroups:
-  - searchruler.prosimcorp.com
+  - searchruler.freepik.com
   resources:
   - clusterruleractions
   verbs:
@@ -20,7 +20,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - searchruler.prosimcorp.com
+  - searchruler.freepik.com
   resources:
   - clusterruleractions/status
   verbs:

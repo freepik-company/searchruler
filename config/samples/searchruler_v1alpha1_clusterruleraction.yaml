@@ -1,4 +1,4 @@
-apiVersion: searchruler.prosimcorp.com/v1alpha1
+apiVersion: searchruler.freepik.com/v1alpha1
 kind: ClusterRulerAction
 metadata:
   labels:

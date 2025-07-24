@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.4
-  name: clusterruleractions.searchruler.prosimcorp.com
+  name: clusterruleractions.searchruler.freepik.com
 spec:
-  group: searchruler.prosimcorp.com
+  group: searchruler.freepik.com
   names:
     kind: ClusterRulerAction
     listKind: ClusterRulerActionList
@@ -50,6 +50,8 @@ spec:
           spec:
             description: RulerActionSpec defines the desired state of RulerAction.
             properties:
+              syncInterval:
+                type: string
               webhook:
                 description: WebHook TODO
                 properties:

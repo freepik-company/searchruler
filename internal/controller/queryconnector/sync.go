@@ -19,6 +19,7 @@ package queryconnector
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	//
 	v1 "k8s.io/api/core/v1"
@@ -26,9 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 
 	//
-	"prosimcorp.com/SearchRuler/api/v1alpha1"
-	"prosimcorp.com/SearchRuler/internal/controller"
-	"prosimcorp.com/SearchRuler/internal/pools"
+	"freepik.com/searchruler/api/v1alpha1"
+	"freepik.com/searchruler/internal/controller"
+	"freepik.com/searchruler/internal/pools"
 )
 
 var (
@@ -61,41 +62,86 @@ func (r *QueryConnectorReconciler) Sync(ctx context.Context, eventType watch.Eve
 		return nil
 	}
 
-	// Get credentials for the queryConnector in the secret associated
-	// First get secret with the credentials. The secret must be in the same
-	// namespace as the QueryConnector resource.
-	QueryConnectorCredsSecret := &v1.Secret{}
-	secretNamespace := resourceSpec.Credentials.SecretRef.Namespace
-	if secretNamespace == "" {
-		secretNamespace = resourceNamespace
-	}
-	namespacedName := types.NamespacedName{
-		Namespace: secretNamespace,
-		Name:      resourceSpec.Credentials.SecretRef.Name,
-	}
-	err = r.Get(ctx, namespacedName, QueryConnectorCredsSecret)
-	if err != nil {
-		// Updates status to NoCredsFound
-		r.UpdateConditionNoCredsFound(resource, resourceType)
-		return fmt.Errorf(controller.SecretNotFoundErrorMessage, namespacedName, err)
+	// If credentials are defined, get them from the secret
+	username := ""
+	password := ""
+	if !reflect.ValueOf(resourceSpec.Credentials).IsZero() {
+		// Get credentials for the queryConnector in the secret associated
+		// First get secret with the credentials. The secret must be in the same
+		// namespace as the QueryConnector resource.
+		QueryConnectorCredsSecret := &v1.Secret{}
+		secretNamespace := resourceSpec.Credentials.SecretRef.Namespace
+		if secretNamespace == "" {
+			secretNamespace = resourceNamespace
+		}
+		namespacedName := types.NamespacedName{
+			Namespace: secretNamespace,
+			Name:      resourceSpec.Credentials.SecretRef.Name,
+		}
+		err = r.Get(ctx, namespacedName, QueryConnectorCredsSecret)
+		if err != nil {
+			// Updates status to NoCredsFound
+			r.UpdateConditionNoCredsFound(resource, resourceType)
+			return fmt.Errorf(controller.SecretNotFoundErrorMessage, namespacedName, err)
+		}
+
+		// Get username and password from the secret data
+		username = string(QueryConnectorCredsSecret.Data[resourceSpec.Credentials.SecretRef.KeyUsername])
+		password = string(QueryConnectorCredsSecret.Data[resourceSpec.Credentials.SecretRef.KeyPassword])
+
+		// If username or password are empty, return an error
+		if username == "" || password == "" {
+			// Updates status to NoCredsFound
+			r.UpdateConditionNoCredsFound(resource, resourceType)
+			return fmt.Errorf(controller.MissingCredentialsMessage, namespacedName)
+		}
 	}
 
-	// Get username and password from the secret data
-	username := string(QueryConnectorCredsSecret.Data[resourceSpec.Credentials.SecretRef.KeyUsername])
-	password := string(QueryConnectorCredsSecret.Data[resourceSpec.Credentials.SecretRef.KeyPassword])
+	// If certificates are defined, get them from the secret
+	ca := ""
+	cert := ""
+	key := ""
+	if !reflect.ValueOf(resourceSpec.Certificates).IsZero() {
+		// Get credentials for the queryConnector in the secret associated
+		// First get secret with the credentials. The secret must be in the same
+		// namespace as the QueryConnector resource.
+		QueryConnectorCertSecret := &v1.Secret{}
+		secretNamespace := resourceSpec.Certificates.SecretRef.Namespace
+		if secretNamespace == "" {
+			secretNamespace = resourceNamespace
+		}
+		namespacedName := types.NamespacedName{
+			Namespace: secretNamespace,
+			Name:      resourceSpec.Certificates.SecretRef.Name,
+		}
+		err = r.Get(ctx, namespacedName, QueryConnectorCertSecret)
+		if err != nil {
+			// Updates status to NoCredsFound
+			r.UpdateConditionNoCredsFound(resource, resourceType)
+			return fmt.Errorf(controller.SecretNotFoundErrorMessage, namespacedName, err)
+		}
 
-	// If username or password are empty, return an error
-	if username == "" || password == "" {
-		// Updates status to NoCredsFound
-		r.UpdateConditionNoCredsFound(resource, resourceType)
-		return fmt.Errorf(controller.MissingCredentialsMessage, namespacedName)
+		// Get username and password from the secret data
+		ca = string(QueryConnectorCertSecret.Data[resourceSpec.Certificates.SecretRef.KeyCA])
+		cert = string(QueryConnectorCertSecret.Data[resourceSpec.Certificates.SecretRef.KeyCert])
+		key = string(QueryConnectorCertSecret.Data[resourceSpec.Certificates.SecretRef.KeyKey])
+
+		// If username or password are empty, return an error
+		if ca == "" || cert == "" || key == "" {
+			// Updates status to NoCredsFound
+			r.UpdateConditionNoCertsFound(resource, resourceType)
+			return fmt.Errorf(controller.MissingCertsMessage, namespacedName)
+		}
 	}
 
-	// Save credentials in the credentials pool
-	key := fmt.Sprintf("%s_%s", resourceNamespace, resourceName)
-	r.CredentialsPool.Set(key, &pools.Credentials{
+	// Save credentials and certificates in the credentials pool
+	poolKey := fmt.Sprintf("%s_%s", resourceNamespace, resourceName)
+	r.CredentialsPool.Set(poolKey, &pools.Credentials{
 		Username: username,
 		Password: password,
+		CA:       ca,
+		Cert:     cert,
+		Key:      key,
 	})
 
 	// Updates status to Success

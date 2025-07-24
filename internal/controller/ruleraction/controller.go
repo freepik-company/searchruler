@@ -19,12 +19,12 @@ package ruleraction
 import (
 	"context"
 	"fmt"
-	corev1 "k8s.io/api/core/v1"
+	"reflect"
+	"time"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -32,10 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	//
-	searchrulerv1alpha1 "prosimcorp.com/SearchRuler/api/v1alpha1"
-	"prosimcorp.com/SearchRuler/internal/controller"
-	"prosimcorp.com/SearchRuler/internal/globals"
-	"prosimcorp.com/SearchRuler/internal/pools"
+	searchrulerv1alpha1 "freepik.com/searchruler/api/v1alpha1"
+	"freepik.com/searchruler/internal/controller"
+	"freepik.com/searchruler/internal/pools"
 )
 
 // RulerActionReconciler reconciles a RulerAction object
@@ -56,9 +55,9 @@ var (
 	deletionTimestamp *v1.Time
 )
 
-// +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=ruleractions,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=ruleractions/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=searchruler.prosimcorp.com,resources=ruleractions/finalizers,verbs=update
+// +kubebuilder:rbac:groups=searchruler.freepik.com,resources=ruleractions,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=searchruler.freepik.com,resources=ruleractions/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=searchruler.freepik.com,resources=ruleractions/finalizers,verbs=update
 
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=events,verbs=get;list;watch
@@ -78,14 +77,7 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		ClusterRulerActionResource: &searchrulerv1alpha1.ClusterRulerAction{},
 	}
 
-	// 1.1 Try with Event resource first. If it is not an Event, then it will return an error
-	// but reconcile will try if it is a RulerAction resource relationated with an Event
-	resourceType, err = r.GetEventRuleAction(ctx, CompoundRulerActionResource, req.Namespace, req.Name)
-	if err == nil {
-		goto processEvent
-	}
-
-	// 1.2 Try with RulerAction or ClusterRulerAction resource
+	// 1 Get the RulerAction or ClusterRulerAction resource
 	switch req.Namespace {
 	case "":
 		resourceType = controller.ClusterRulerActionResourceType
@@ -169,19 +161,28 @@ func (r *RulerActionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}()
 
 	// 6. Schedule periodical request
-	// if !triggeredByEvent {
-	// 	RequeueTime, err := time.ParseDuration(RulerActionResource.Spec.FiringInterval)
-	// 	if err != nil {
-	// 		logger.Info(fmt.Sprintf(resourceSyncTimeRetrievalError, RulerActionResourceType, req.NamespacedName, err.Error()))
-	// 		return result, err
-	// 	}
-	// 	result = ctrl.Result{
-	// 		RequeueAfter: RequeueTime,
-	// 	}
-	// }
+	syncInterval := controller.DefaultSyncIntervalRulerAction
+	switch resourceType {
+	case controller.ClusterQueryConnectorResourceType:
+		if !reflect.ValueOf(CompoundRulerActionResource.ClusterRulerActionResource.Spec.SyncInterval).IsZero() {
+			syncInterval = CompoundRulerActionResource.ClusterRulerActionResource.Spec.SyncInterval
+		}
+	default:
+		if !reflect.ValueOf(CompoundRulerActionResource.RulerActionResource.Spec.SyncInterval).IsZero() {
+			syncInterval = CompoundRulerActionResource.RulerActionResource.Spec.SyncInterval
+		}
+	}
+
+	RequeueTime, err := time.ParseDuration(syncInterval)
+	if err != nil {
+		logger.Info(fmt.Sprintf(controller.ResourceSyncTimeRetrievalError, resourceType, req.NamespacedName, err.Error()))
+		return result, err
+	}
+	result = ctrl.Result{
+		RequeueAfter: RequeueTime,
+	}
 
 	// 7. Sync credentials if defined
-processEvent:
 	err = r.Sync(ctx, CompoundRulerActionResource, resourceType)
 	if err != nil {
 		r.UpdateConditionKubernetesApiCallFailure(CompoundRulerActionResource, resourceType)
@@ -197,14 +198,10 @@ processEvent:
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *RulerActionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// Just watch for SearchRuler event resources that starts with "searchruler-alert-"
-	prefixFilter := globals.PrefixFilterPredicate{Prefix: "searchruler-alert-"}
-
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&searchrulerv1alpha1.RulerAction{}).
 		Named("RulerAction").
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		Watches(&searchrulerv1alpha1.ClusterRulerAction{}, &handler.EnqueueRequestForObject{}).
-		Watches(&corev1.Event{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(prefixFilter)). // Also watch for events, so SearchRule controller throws events when a rule is firing
 		Complete(r)
 }
