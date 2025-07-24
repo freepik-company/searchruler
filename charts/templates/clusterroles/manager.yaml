@@ -1,0 +1,65 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "searchruler.fullname" . }}-manager
+  labels:
+    {{- include "searchruler.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - events.k8s.io
+  resources:
+  - events
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - searchruler.freepik.com
+  resources:
+  - queryconnectors
+  - ruleractions
+  - searchrules
+  - clusterqueryconnectors
+  - clusterruleractions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - searchruler.freepik.com
+  resources:
+  - queryconnectors/finalizers
+  - ruleractions/finalizers
+  - searchrules/finalizers
+  - clusterqueryconnectors/finalizers
+  - clusterruleractions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - searchruler.freepik.com
+  resources:
+  - queryconnectors/status
+  - ruleractions/status
+  - searchrules/status
+  - clusterqueryconnectors/status
+  - clusterruleractions/status
+  verbs:
+  - get
+  - patch
+  - update
