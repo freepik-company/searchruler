@@ -50,6 +50,31 @@ spec:
           spec:
             description: QueryConnectorSpec defines the desired state of QueryConnector.
             properties:
+              certificates:
+                description: QueryConnectorCertificates TODO
+                properties:
+                  secretRef:
+                    description: CertificatesSecretRef TODO
+                    properties:
+                      keyCA:
+                        type: string
+                      keyCert:
+                        type: string
+                      keyKey:
+                        type: string
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                    required:
+                    - keyCA
+                    - keyCert
+                    - keyKey
+                    - name
+                    type: object
+                required:
+                - secretRef
+                type: object
               credentials:
                 description: QueryConnectorCredentials TODO
                 properties:
@@ -69,8 +94,6 @@ spec:
                     - keyUsername
                     - name
                     type: object
-                  syncInterval:
-                    type: string
                 required:
                 - secretRef
                 type: object
@@ -78,6 +101,8 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
+              syncInterval:
+                type: string
               tlsSkipVerify:
                 type: boolean
               url:

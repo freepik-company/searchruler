@@ -117,8 +117,6 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *CompoundRule
 			return fmt.Errorf(controller.HttpRequestCreationErrorMessage, err)
 		}
 
-		defer httpRequest.Body.Close()
-
 		// Add headers to the request if set
 		httpRequest.Header.Set("Content-Type", "application/json")
 		for headerKey, headerValue := range resourceSpec.Webhook.Headers {

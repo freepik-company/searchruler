@@ -134,13 +134,11 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 	}
 
 	// Get credentials for QueryConnector attached if defined
-	if !reflect.ValueOf(QueryConnectorSpec.Credentials).IsZero() {
-		key := fmt.Sprintf("%s_%s", QueryConnectorResource.GetNamespace(), QueryConnectorResource.GetName())
-		queryConnectorCreds, credsExists = r.QueryConnectorCredentialsPool.Get(key)
-		if !credsExists {
-			r.UpdateConditionNoCredsFound(resource)
-			return fmt.Errorf(controller.MissingCredentialsMessage, key)
-		}
+	key := fmt.Sprintf("%s_%s", QueryConnectorResource.GetNamespace(), QueryConnectorResource.GetName())
+	queryConnectorCreds, credsExists = r.QueryConnectorCredentialsPool.Get(key)
+	if !credsExists {
+		r.UpdateConditionNoCredsFound(resource)
+		return fmt.Errorf(controller.MissingCredentialsMessage, key)
 	}
 
 	// Get `for` duration for the rules firing. When rule is firing during this for time,

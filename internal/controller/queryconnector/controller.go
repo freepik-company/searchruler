@@ -184,20 +184,11 @@ func (r *QueryConnectorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	// 7. Sync credentials if defined
-	credentials := CompoundQueryConnectorResource.QueryConnectorResource.Spec.Credentials
-	certificates := CompoundQueryConnectorResource.QueryConnectorResource.Spec.Certificates
-	if resourceType == controller.ClusterQueryConnectorResourceType {
-		credentials = CompoundQueryConnectorResource.ClusterQueryConnectorResource.Spec.Credentials
-		certificates = CompoundQueryConnectorResource.ClusterQueryConnectorResource.Spec.Certificates
-	}
-
-	if !reflect.ValueOf(credentials).IsZero() && !reflect.ValueOf(certificates).IsZero() {
-		err = r.Sync(ctx, watch.Modified, CompoundQueryConnectorResource, resourceType)
-		if err != nil {
-			r.UpdateConditionKubernetesApiCallFailure(CompoundQueryConnectorResource, resourceType)
-			logger.Info(fmt.Sprintf(controller.SyncTargetError, resourceType, req.NamespacedName, err.Error()))
-			return result, err
-		}
+	err = r.Sync(ctx, watch.Modified, CompoundQueryConnectorResource, resourceType)
+	if err != nil {
+		r.UpdateConditionKubernetesApiCallFailure(CompoundQueryConnectorResource, resourceType)
+		logger.Info(fmt.Sprintf(controller.SyncTargetError, resourceType, req.NamespacedName, err.Error()))
+		return result, err
 	}
 
 	// 8. Success, update the status

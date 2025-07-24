@@ -18,7 +18,7 @@ spec:
 
   # Interval to check secret credentials for any changes
   # Default value is 1m
-  #syncInterval: 1m
+  syncInterval: 15s
 
   # Certificates to use for the connection
   certificates:
@@ -28,10 +28,11 @@ spec:
       keyCA: ca.crt
       keyCert: cert.crt
       keyKey: key.pem
+
   # Secret reference to get the credentials if needed for the connection
-  credentials:
-    secretRef:
-      name: elastic-main-creds
-      namespace: default
-      keyUsername: username
-      keyPassword: password
+  # credentials:
+  #   secretRef:
+  #     name: elastic-main-creds
+  #     namespace: default
+  #     keyUsername: username
+  #     keyPassword: password
