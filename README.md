@@ -1,5 +1,7 @@
 # searchruler
-### 🔥 Meet searchruler: The Log Alerting Engine You Didn’t Know You Needed!
+### 🔥 Meet searchruler: The Log Alerting Engine You Didn't Know You Needed!
+
+> **📢 Migration Notice**: Starting from version [v0.5.0](https://github.com/freepik-company/searchruler/releases/tag/v0.5.0), this project has been migrated from the `prosimcorp` organization to `freepik-company`. Please update your references and dependencies to use the new repository location.
 
 <img src="https://raw.githubusercontent.com/prosimcorp/searchruler/master/docs/img/logo.png" alt="searchruler Logo (Main) logo." width="150">
 
