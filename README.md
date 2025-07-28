@@ -186,6 +186,9 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: searchrule-sample
 spec:
+  description: "Alert when there are a high error rate in the application."
+
+  # ... other fields remain the same ...
 
   # Description for the Rule. It is not used in the rule execution, but is useful for the
   # message template in the RuleAction.

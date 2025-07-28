@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -74,7 +75,73 @@ var (
 
 	// Elasticsearch search path
 	ElasticsearchSearchURL = "%s/%s/_search"
+
+	// Shared HTTP client with connection pooling
+	httpClientCache = make(map[string]*http.Client)
+	httpClientMutex sync.RWMutex
 )
+
+// getOrCreateHTTPClient creates or reuses an HTTP client for the given configuration
+func getOrCreateHTTPClient(connectorSpec *v1alpha1.QueryConnectorSpec, creds *pools.Credentials) *http.Client {
+	// Create a unique key for this configuration
+	key := fmt.Sprintf("%s_%s_%t", connectorSpec.URL, connectorSpec.Credentials.SecretRef.Name, connectorSpec.TlsSkipVerify)
+
+	httpClientMutex.RLock()
+	if client, exists := httpClientCache[key]; exists {
+		httpClientMutex.RUnlock()
+		return client
+	}
+	httpClientMutex.RUnlock()
+
+	// Configure TLS settings
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: connectorSpec.TlsSkipVerify,
+	}
+
+	// Add certificates if set for elasticsearch queries
+	if connectorSpec.Certificates.SecretRef.Name != "" && creds != nil {
+		// Load client certificates for mTLS
+		cert, err := tls.X509KeyPair([]byte(creds.Cert), []byte(creds.Key))
+		if err == nil {
+			tlsConfig.Certificates = []tls.Certificate{cert}
+
+			// Add CA certificate if available for server verification
+			if creds.CA != "" {
+				caCertPool := x509.NewCertPool()
+				if caCertPool.AppendCertsFromPEM([]byte(creds.CA)) {
+					tlsConfig.RootCAs = caCertPool
+				}
+			}
+		}
+	}
+
+	// Create HTTP client with proper connection pooling and timeouts
+	transport := &http.Transport{
+		TLSClientConfig: tlsConfig,
+		// Connection pooling settings
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     90 * time.Second,
+		// Timeouts
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: 30 * time.Second,
+		// Keep alive
+		DisableKeepAlives:  false,
+		DisableCompression: false,
+	}
+
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   60 * time.Second, // Overall request timeout
+	}
+
+	// Cache the client
+	httpClientMutex.Lock()
+	httpClientCache[key] = client
+	httpClientMutex.Unlock()
+
+	return client
+}
 
 // Sync execute the query to the elasticsearch and evaluate the condition. Then trigger the action adding the alert to the pool
 // and sending an event to the Kubernetes API
@@ -174,38 +241,8 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 		elasticQuery = []byte(resource.Spec.Elasticsearch.QueryJSON)
 	}
 
-	// Configure TLS settings
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: QueryConnectorSpec.TlsSkipVerify,
-	}
-
-	// Add certificates if set for elasticsearch queries
-	if QueryConnectorSpec.Certificates.SecretRef.Name != "" {
-		// Load client certificates for mTLS
-		cert, err := tls.X509KeyPair([]byte(queryConnectorCreds.Cert), []byte(queryConnectorCreds.Key))
-		if err != nil {
-			r.UpdateConditionConnectionError(resource)
-			return fmt.Errorf("error loading client certificates: %v", err)
-		}
-		tlsConfig.Certificates = []tls.Certificate{cert}
-
-		// Add CA certificate if available for server verification
-		if queryConnectorCreds.CA != "" {
-			caCertPool := x509.NewCertPool()
-			if !caCertPool.AppendCertsFromPEM([]byte(queryConnectorCreds.CA)) {
-				r.UpdateConditionConnectionError(resource)
-				return fmt.Errorf("error loading CA certificate")
-			}
-			tlsConfig.RootCAs = caCertPool
-		}
-	}
-
-	// Make http client for elasticsearch connection
-	httpClient := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: tlsConfig,
-		},
-	}
+	// Get or create HTTP client for this configuration
+	httpClient := getOrCreateHTTPClient(QueryConnectorSpec, queryConnectorCreds)
 
 	// Generate URL for search to elasticsearch
 	searchURL := fmt.Sprintf(
