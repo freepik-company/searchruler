@@ -295,7 +295,6 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 			State:         RuleNormalState,
 			ResolvingTime: time.Time{},
 			Value:         conditionValue.Float(),
-			Aggregations:  nil,
 		}
 		r.RulesPool.Set(ruleKey, rule)
 	}
@@ -308,7 +307,6 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 
 	// Set the current value of the condition to the rule
 	rule.Value = conditionValue.Float()
-	rule.Aggregations = aggregationsResource
 	r.RulesPool.Set(ruleKey, rule)
 
 	// If rule is firing right now
@@ -387,7 +385,6 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 				ResolvingTime: time.Time{},
 				SearchRule:    *resource,
 				Value:         conditionValue.Float(),
-				Aggregations:  aggregationsResource,
 			}
 			r.RulesPool.Set(ruleKey, rule)
 

@@ -104,6 +104,10 @@ spec:
     # object, value and, if exists, elasticsearch aggregations field variables. The object 
     # variable is the SearchRule object and the value variable is the value of the conditionField.
 
+    # Mode to send the message to the RuleAction.
+    # Available options: raw, alertmanager
+    mode: "raw" # Default value is "raw"
+
     # If the ruleaction is a alertmanager webhook, the message must be in alertmanager format:
     # https://prometheus.io/docs/alerting/latest/clients/
     data: |
@@ -114,26 +118,13 @@ spec:
       {{ printf "Description: %s" $object.Spec.Description }}
       {{ printf "Current value: %v" $value }}
 
-  # Custom metrics to extract from the elasticsearch response
-  # Just support for gauge custom metrics yet.
-  customMetrics:
-    # Custom metric name to create in the Prometheus server
-    - name: "searchrule_custom_metric"
-      # Custom metric help description
-      help: "Custom metric help description 2"
-      # Aggregations to extract the custom metric value from the elasticsearch response
-      # It must be a map with at least 2 values, the key and the value or doc_count
-      # GJson path to the aggregation value
-      aggregation_map: "last_15_days.buckets.0.status_codes.buckets"
-      # Custom metric labels
-      labels:
-        - name: "ip"
-          value: "key"
-        - name: "test"
-          value: "doc_count"
-        - name: "static_label"
-          value: "static_value"
-          # If the value is a static value not got from aggregation_map, set the staticValue field to true
-          staticValue: true
-      # Custom metric value to extract from the elasticsearch response
-      value: "doc_count"
+    # Mode to send the message to the RuleAction.
+    # Available options: raw, alertmanager
+    # mode: "alertmanager"
+
+    # labels:
+    #   team: "team-name"
+    # annotations:
+    #   dashboard_url: "https://grafana.com/dashboards/123"
+    #   summary: "Alert summary"
+    #   description: "Alert description"
