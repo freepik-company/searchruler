@@ -52,14 +52,23 @@ spec:
               actionRef:
                 description: ActionRef TODO
                 properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    type: object
                   data:
+                    type: string
+                  labels:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  mode:
                     type: string
                   name:
                     type: string
                   namespace:
                     type: string
                 required:
-                - data
                 - name
                 type: object
               checkInterval:
@@ -78,40 +87,6 @@ spec:
                 - operator
                 - threshold
                 type: object
-              customMetrics:
-                items:
-                  description: CustomMetric TODO
-                  properties:
-                    aggregation_map:
-                      type: string
-                    help:
-                      type: string
-                    labels:
-                      items:
-                        description: MetricLabels TODO
-                        properties:
-                          name:
-                            type: string
-                          staticValue:
-                            type: boolean
-                          value:
-                            type: string
-                        required:
-                        - name
-                        - value
-                        type: object
-                      type: array
-                    name:
-                      type: string
-                    value:
-                      type: string
-                  required:
-                  - aggregation_map
-                  - help
-                  - name
-                  - value
-                  type: object
-                type: array
               description:
                 type: string
               elasticsearch:

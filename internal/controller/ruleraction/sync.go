@@ -20,10 +20,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"reflect"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -148,11 +150,24 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *CompoundRule
 			templateInjectedObject["object"] = alert.SearchRule
 			templateInjectedObject["aggregations"] = alert.Aggregations
 
-			// Evaluate the data template with the injected object
-			parsedMessage, err := template.EvaluateTemplate(alert.SearchRule.Spec.ActionRef.Data, templateInjectedObject)
-			if err != nil {
-				r.UpdateConditionEvaluateTemplateError(resource, resourceType)
-				return fmt.Errorf(controller.EvaluateTemplateErrorMessage, err)
+			var parsedMessage string
+			var err error
+
+			// If the mode is alertmanager, generate alertmanager payload with templated labels/annotations
+			if alert.SearchRule.Spec.ActionRef.Mode == "alertmanager" {
+				parsedMessage, err = r.generateAlertmanagerPayload(alert, templateInjectedObject)
+				if err != nil {
+					r.UpdateConditionEvaluateTemplateError(resource, resourceType)
+					return fmt.Errorf("error generating alertmanager payload: %v", err)
+				}
+			} else {
+				// For raw mode, evaluate the data template directly
+				data := alert.SearchRule.Spec.ActionRef.Data
+				parsedMessage, err = template.EvaluateTemplate(data, templateInjectedObject)
+				if err != nil {
+					r.UpdateConditionEvaluateTemplateError(resource, resourceType)
+					return fmt.Errorf(controller.EvaluateTemplateErrorMessage, err)
+				}
 			}
 
 			// Check if the webhook has a validator and execute it when available
@@ -197,6 +212,60 @@ func (r *RulerActionReconciler) Sync(ctx context.Context, resource *CompoundRule
 	// Updates status to Success
 	r.UpdateStateSuccess(resource, resourceType)
 	return nil
+}
+
+// generateAlertmanagerPayload generates a payload for Alertmanager with templated labels and annotations
+func (r *RulerActionReconciler) generateAlertmanagerPayload(alert *pools.Alert, templateInjectedObject map[string]interface{}) (string, error) {
+
+	// Get the checkInterval from the SearchRule to set the endsAt time to the double of the checkInterval
+	checkInterval := alert.SearchRule.Spec.CheckInterval
+	duration, err := time.ParseDuration(checkInterval)
+	if err != nil {
+		return "", fmt.Errorf("error parsing checkInterval: %v", err)
+	}
+	endsAt := time.Now().UTC().Add(duration * 2)
+
+	// Create base alert structure
+	amAlert := validators.AlertmanagerAlert{
+		Labels:      make(map[string]string),
+		Annotations: make(map[string]string),
+		StartsAt:    time.Now().UTC().Format(time.RFC3339),
+		EndsAt:      endsAt.Format(time.RFC3339),
+	}
+
+	// Process labels
+	for key, value := range alert.SearchRule.Spec.ActionRef.Labels {
+		// Evaluate template for label value
+		parsedValue, err := template.EvaluateTemplate(value, templateInjectedObject)
+		if err != nil {
+			return "", fmt.Errorf("error evaluating label template %s: %v", key, err)
+		}
+		amAlert.Labels[key] = parsedValue
+	}
+
+	// Process annotations
+	for key, value := range alert.SearchRule.Spec.ActionRef.Annotations {
+		// Evaluate template for annotation value
+		parsedValue, err := template.EvaluateTemplate(value, templateInjectedObject)
+		if err != nil {
+			return "", fmt.Errorf("error evaluating annotation template %s: %v", key, err)
+		}
+		amAlert.Annotations[key] = parsedValue
+	}
+
+	// Ensure required alertname label exists
+	if _, exists := amAlert.Labels["alertname"]; !exists {
+		amAlert.Labels["alertname"] = alert.SearchRule.Name
+	}
+
+	// Convert to JSON
+	alertList := validators.AlertmanagerAlertList{amAlert}
+	payload, err := json.Marshal(alertList)
+	if err != nil {
+		return "", fmt.Errorf("error marshaling alertmanager payload: %v", err)
+	}
+
+	return string(payload), nil
 }
 
 // getRulerActionAssociatedAlerts returns all alerts associated with the RulerAction
