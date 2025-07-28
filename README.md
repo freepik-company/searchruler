@@ -107,12 +107,21 @@ spec:
   # Skip certificate verification if the connection is HTTPS
   tlsSkipVerify: true
 
+  # Interval to check secret credentials for any changes
+  # Default value is 1m
+  syncInterval: 15s
+
+  # Certificates to use for the connection
+  certificates:
+    secretRef:
+      name: elasticsearch-main-certificates
+      namespace: default
+      keyCA: ca.crt
+      keyCert: cert.crt
+      keyKey: key.pem
+
   # Secret reference to get the credentials if needed for the connection
   credentials:
-
-    # Interval to check secret credentials for any changes
-    # Default value is 1m
-    #syncInterval: 1m
 
     secretRef:
       name: elasticsearch-main-credentials
@@ -173,108 +182,29 @@ For cluster scope just change **QueryConnector** for **ClusterRulerAction**.
 
 This is where the magic happens! SearchRules define the conditions to check in your log sources (via queryconnectors) and specify where to send alerts (using ruleractions). You get to decide what matters and how to act on it. 🎯
 
-Here are two quick examples to show you what’s possible:
+The SearchRule supports two modes for sending alerts:
+- **raw**: The default mode. Allows complete freedom in the message format using Go templating.
+- **alertmanager**: Structured mode that generates Alertmanager-compatible alerts with templated labels and annotations.
 
-1️⃣ **Simple Match Count Alert**. Trigger an alert when the number of matching documents exceeds a threshold:
+Here are examples showing both modes:
+
+1️⃣ **Raw Mode Example** - Simple Match Count Alert with custom message format:
 
 ```yaml
 apiVersion: searchruler.freepik.com/v1alpha1
 kind: SearchRule
 metadata:
-  labels:
-    app.kubernetes.io/name: search-ruler
-    app.kubernetes.io/managed-by: kustomize
   name: searchrule-sample
 spec:
   description: "Alert when there are a high error rate in the application."
-
+  
   # ... other fields remain the same ...
 
-  # Description for the Rule. It is not used in the rule execution, but is useful for the
-  # message template in the RuleAction.
-  description: "Alert when there are a high error rate in the application."
-
-  # QueryConnector reference to execute the queries for the rule evaluation.
-  queryConnectorRef:
-    name: queryconnector-sample
-    # Empty namespace it searchs for a clusterqueryconnector resource
-    namespace: "default"
-
-  # Interval time for checking the value of the query. For example, every 30s we will
-  # execute the query value to elasticsearch
-  checkInterval: 30s
-
-  # Elasticsearch configuration for the query execution.
-  # Just elasticsearch is implemented yet.
-  elasticsearch:
-
-    # Index, index pattern or alias where the query will be executed
-    # It will be appended to <URL>/<index>/_search endpoint
-    index: "kibana_sample_data_logs"
-
-    # Elasticsearch query to execute.
-    # Normally it is a JSON query, but we are using YAML format for the manifest ;D
-    # so please, transform your JSON query to YAML in the manifest.
-    # This option will execute the query: {"_source": [""], "query": { "bool": { "must": [ { "range": { "response": { "gte": 499 } } } ] } } }
-    query:
-      _source: [""]
-      query: 
-        bool:
-          must:
-            - range:
-                response:
-                  gte: 499
-
-    # Okay, if you don't like YAML format, you can use the queryJSON field to put the JSON query
-    # directly in the manifest. It will be parsed to the query field. But, if you use both fields,
-    # the operator will fail.
-    # queryJSON: >
-    #   {
-    #     "_source": [""],
-    #     "query": {
-    #       "bool": {
-    #         "must": [
-    #           {
-    #             "range": {
-    #               "response": {
-    #                 "gte": 499
-    #               }
-    #             }
-    #           }
-    #         ]
-    #       }
-    #     }
-    #   }
-
-    # Response JSON field to watch for the condition check. Each query to elasticsearch
-    # returns a JSON response like:
-    # { "hits": "total": { "value": 100 }, hits: [ ... ] }
-    # hits.total.value checks the total hits of the query
-    # Underhood searchruler uses GJson to get this conditionField to check, so if you
-    # want to get a value from an array you can use aggregations.hosts.buckets.#.total_response_time.value@values|#(>100)
-    conditionField: "hits.total.value"
-
-  # Condition for the rule evaluation. It will check the conditionField value with the
-  # operator and threshold. If the condition is true, the RuleAction will be executed.
-  condition:
-    # Available options: greaterThan, greaterThanOrEqual, lessThan, lessThanOrEqual or equal
-    operator: "greaterThan"
-    # Threshold value to check the condition
-    threshold: "100"
-    # Time window to check the condition. For example, if the condition is greaterThan 100 for 1m
-    for: "1m"
-
-  # RuleAction reference to execute when the condition is true.
   actionRef:
     name: ruleraction-sample
-     # Empty namespace it searchs for a clusterruleraction resource
     namespace: "default"
-    # Message template to send in the RuleAction execution. It is a Go template with the
-    # object, value and, if exists, elasticsearch aggregations field variables. The object 
-    # variable is the SearchRule object and the value variable is the value of the conditionField.
-
-    # If the ruleaction is a alertmanager webhook, the message must be in alertmanager format:
-    # https://prometheus.io/docs/alerting/latest/clients/
+    # Raw mode (default) allows any message format
+    mode: "raw"  # This is optional as raw is the default
     data: |
       {{- $object := .object -}}
       {{- $value := .value -}}
@@ -282,38 +212,67 @@ spec:
       {{ printf "Name: %s" $object.Name }}
       {{ printf "Description: %s" $object.Spec.Description }}
       {{ printf "Current value: %v" $value }}
-
-   # Custom metrics to extract from the elasticsearch response
-   # Just support for gauge custom metrics yet.
-  customMetrics:
-     # Custom metric name to create in the Prometheus server
-     - name: "searchrule_custom_metric"
-        # Custom metric help description
-       help: "Custom metric help description 2"
-        # Aggregations to extract the custom metric value from the elasticsearch response
-        # It must be a map with at least 2 values, the key and the value or doc_count
-        # GJson path to the aggregation value
-       aggregation_map: "last_15_days.buckets.0.status_codes.buckets"
-        # Custom metric labels
-       labels:
-          - name: "ip"
-            value: "key"
-          - name: "test"
-            value: "doc_count"
-          - name: "static_label"
-            value: "static_value"
-             # If the value is a static value not got from aggregation_map, set the staticValue field to true
-            staticValue: true
-        # Custom metric value to extract from the elasticsearch response
-       value: "doc_count"
 ```
->[!TIP]
-> Underhood searchrule uses in `conditionField` field `GJson` library, so you can use whatever expression you
-> want for GJson to check your JSONs responded by Elasticsearch. Here you have a debugger --> https://gjson.dev/
 
->[!IMPORTANT]
-> By the moment, `conditionField` MUST return just a single value (number or float),
-> it is not prepared for array elements. But it's just by the moment, we are working hard to implement it :D 
+2️⃣ **Alertmanager Mode Example** - Using Alertmanager's format with templated labels and annotations:
+
+```yaml
+apiVersion: searchruler.freepik.com/v1alpha1
+kind: SearchRule
+metadata:
+  name: searchrule-alertmanager-sample
+spec:
+  description: "Alert on high latency with Alertmanager format"
+  
+  # ... other fields remain the same ...
+
+  actionRef:
+    name: ruleraction-sample
+    namespace: "default"
+    # Use Alertmanager mode to generate compatible alerts
+    mode: "alertmanager"
+    # Define labels that will be included in the alert
+    labels:
+      alertname: "high_latency"
+      severity: "warning"
+      service: "{{ .object.Spec.Description }}"
+      value: "{{ .value }}"
+    # Define annotations for additional alert context
+    annotations:
+      summary: "High latency detected"
+      description: |
+        Service {{ .object.Spec.Description }} is experiencing high latency
+        Current value: {{ .value }}
+        Check interval: {{ .object.Spec.CheckInterval }}
+```
+
+#### 🔄 Mode Differences
+
+1. **Raw Mode (`mode: "raw"` or omitted)**
+   - Complete freedom in message format
+   - Uses the `data` field for the entire message template
+   - Perfect for custom webhooks or simple notifications
+
+2. **Alertmanager Mode (`mode: "alertmanager"`)**
+   - Generates Alertmanager-compatible alert format
+   - Uses `labels` and `annotations` fields for templating
+   - Automatically sets required fields like `startsAt` and `endsAt`
+   - `endsAt` is calculated as 2 times the `checkInterval`
+   - Ensures the required `alertname` label exists
+   - Compatible with Alertmanager validation in RulerAction
+
+#### 🎯 When to Use Each Mode
+
+- Use **raw mode** when:
+  - Sending to custom webhooks
+  - Need complete control over message format
+  - Integrating with systems that aren't Alertmanager
+
+- Use **alertmanager mode** when:
+  - Sending alerts to Alertmanager
+  - Need structured alerts with labels and annotations
+  - Want automatic validation of alert format
+  - Need proper alert lifecycle management (start/end times)
 
 #### 📩 Customizing Alert Messages for Alertmanager
 In the `actionRef.data` field, you define the message that gets sent to your webhook. If your webhook is Alertmanager, you'll need to structure the message according to Alertmanager's format. Plus, you can enable the validator in the RulerAction to ensure everything’s correctly formatted.
@@ -538,52 +497,6 @@ searchrule_state{rule="searchrule-sample",state="PendingResolving"} 0
 # HELP searchrule_value Value of the search rule
 # TYPE searchrule_value gauge
 searchrule_value{rule="searchrule-sample"} 3401
-```
-
-### Custom metrics
-Custom metrics are the metrics defined in the `SearchRule` manifest. The metrics are defined in the `customMetrics` field
-of the `SearchRule` manifest. The metrics are defined with the following fields:
-* `name`: The name of the custom metric.
-* `help`: The help description of the custom metric.
-* `aggregation_map`: The GJson path to the aggregation value.
-* `labels`: The labels of the custom metric.
-* `value`: The value of the custom metric.
-* `staticValue`: If the value is a static value not got from `aggregation_map`, set the `staticValue` field to `true`.
-
-Example:
-```yaml
-   # Custom metrics to extract from the elasticsearch response
-   # Just support for gauge custom metrics yet.
-  customMetrics:
-     # Custom metric name to create in the Prometheus server
-     - name: "searchrule_custom_metric"
-        # Custom metric help description
-       help: "Custom metric help description 2"
-        # Aggregations to extract the custom metric value from the elasticsearch response
-        # It must be a map with at least 2 values, the key and the value or doc_count
-        # GJson path to the aggregation value
-       aggregation_map: "last_15_days.buckets.0.status_codes.buckets"
-        # Custom metric labels
-       labels:
-          - name: "ip"
-            value: "key"
-          - name: "test"
-            value: "doc_count"
-          - name: "static_label"
-            value: "static_value"
-             # If the value is a static value not got from aggregation_map, set the staticValue field to true
-            staticValue: true
-        # Custom metric value to extract from the elasticsearch response
-       value: "doc_count"
-```
-
-Output:
-```
-# HELP searchrule_custom_metric Custom metric help description 2
-# TYPE searchrule_custom_metric gauge
-searchrule_custom_metric{ip="200",static_label="static_value",test="3401"} 3401
-searchrule_custom_metric{ip="404",static_label="static_value",test="175"} 175
-searchrule_custom_metric{ip="503",static_label="static_value",test="112"} 112
 ```
 
 ## How to develop
