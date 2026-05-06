@@ -58,6 +58,29 @@ resources:
 
 > 🧚🏼 **Hey, listen! If you prefer to deploy using Helm, go to the [Helm registry](https://prosimcorp.github.io/helm-charts/)**
 
+### Helm chart upgrade notes
+
+Starting with the version that introduces this layout, the chart manages CRDs through `templates/crds/` (controlled by `crds.install` and `crds.keep` in `values.yaml`) instead of the legacy `crds/` directory. This makes `helm upgrade` actually update the CRDs so new fields land on existing clusters — Helm never updates CRDs that live in the special `crds/` folder.
+
+If you installed a previous version of this chart, the CRDs already in your cluster were not created by Helm and will conflict on the first upgrade with `Error: rendered manifests contain a resource that already exists`. Adopt them into the release once before upgrading:
+
+```bash
+RELEASE=searchruler          # your helm release name
+NS=searchruler-system        # the namespace where you installed it
+
+for crd in clusterqueryconnectors clusterruleractions queryconnectors ruleractions searchrules; do
+  kubectl annotate crd "$crd.searchruler.freepik.com" \
+    meta.helm.sh/release-name="$RELEASE" \
+    meta.helm.sh/release-namespace="$NS" --overwrite
+  kubectl label crd "$crd.searchruler.freepik.com" \
+    app.kubernetes.io/managed-by=Helm --overwrite
+done
+
+helm upgrade "$RELEASE" searchruler/searchruler -n "$NS"
+```
+
+By default the chart sets `helm.sh/resource-policy: keep` on every CRD, so `helm uninstall` does not cascade-delete your `SearchRule`/`QueryConnector`/`RulerAction` instances. Set `crds.keep=false` if you want full teardown on uninstall.
+
 
 ## Flags
 

@@ -5,6 +5,21 @@
 nameOverride: ""
 fullnameOverride: ""
 
+# CRD lifecycle management.
+#
+# CRDs in this chart live under templates/crds/ (not the legacy crds/ directory)
+# so that `helm upgrade` updates them. Helm only installs CRDs from the legacy
+# crds/ directory once and never updates them on upgrade, which blocks
+# rolling out new fields added to the operator's API.
+crds:
+  # Install CRDs as part of the chart. Disable when managing CRDs externally
+  # (e.g. via GitOps or a separate manifest pipeline).
+  install: true
+  # Keep CRDs on `helm uninstall` (sets metadata.annotations."helm.sh/resource-policy": keep).
+  # Strongly recommended in production: removing the CRDs cascades-deletes every
+  # SearchRule, QueryConnector, RulerAction, etc. instance the user has created.
+  keep: true
+
 # TODO
 controller:
 
