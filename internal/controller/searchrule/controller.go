@@ -18,13 +18,16 @@ package searchrule
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	//
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -43,6 +46,20 @@ type SearchRuleReconciler struct {
 	QueryConnectorCredentialsPool *pools.CredentialsStore
 	RulesPool                     *pools.RulesStore
 	AlertsPool                    *pools.AlertsStore
+
+	// PrometheusRuleSupported indicates whether the cluster has the
+	// monitoring.coreos.com/v1 PrometheusRule CRD installed. Detected once at
+	// boot time. When false, SearchRules that opt into spec.prometheusRule are
+	// reconciled but the reconciler reports the feature as unsupported instead
+	// of trying to create the resource.
+	PrometheusRuleSupported bool
+
+	// MetricsExposed indicates whether the operator was started with the
+	// custom-metrics endpoint enabled (--rules-metrics-bind-address != "0").
+	// When false, generated PrometheusRules will alert on a metric that is
+	// not exposed; we still create them but flag the SearchRule status with a
+	// MetricsNotExposed condition so the user can spot the misconfiguration.
+	MetricsExposed bool
 }
 
 // +kubebuilder:rbac:groups=searchruler.freepik.com,resources=searchrules,verbs=get;list;watch;create;update;patch;delete
@@ -50,6 +67,8 @@ type SearchRuleReconciler struct {
 // +kubebuilder:rbac:groups=searchruler.freepik.com,resources=searchrules/finalizers,verbs=update
 
 // +kubebuilder:rbac:groups="events.k8s.io",resources=events,verbs=get;list;watch;create;update;patch
+
+// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -106,44 +125,91 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
-	// 5. Update the status before the requeue
+	// 5. Update the status before the requeue. We must not overwrite the
+	// outer `err` here, otherwise a transient PrometheusRule/Sync failure
+	// would be hidden by a successful status update and the controller
+	// would not retry until the spec changes.
 	defer func() {
-		err = r.Status().Update(ctx, searchRuleResource)
-		if err != nil {
-			logger.Info(fmt.Sprintf(controller.ResourceConditionUpdateError, controller.SearchRuleResourceType, req.NamespacedName, err.Error()))
+		if statusErr := r.Status().Update(ctx, searchRuleResource); statusErr != nil {
+			logger.Info(fmt.Sprintf(controller.ResourceConditionUpdateError, controller.SearchRuleResourceType, req.NamespacedName, statusErr.Error()))
+			if err == nil {
+				err = statusErr
+			}
 		}
 	}()
 
-	// 6. Schedule periodical request
+	// 6. Reconcile the auto-generated PrometheusRule first so a transition
+	// from "enabled" to "disabled" (or to "no outputs at all") deletes the
+	// existing PrometheusRule before any short-circuit return below. If we
+	// returned earlier on MissingOutput, a previously-created PrometheusRule
+	// would survive in the cluster and keep firing alerts even though the
+	// SearchRule no longer defines any active output.
+	//
+	// We do NOT return on a PrometheusRule failure: the actionRef output is
+	// independent and must keep working when the prometheus-operator side
+	// has a transient API error or a name conflict. The error is collected
+	// so controller-runtime still requeues with backoff.
+	prErr := r.reconcilePrometheusRule(ctx, searchRuleResource)
+	if prErr != nil {
+		logger.Info(fmt.Sprintf("failed to reconcile PrometheusRule for %s: %s",
+			req.NamespacedName, prErr.Error()))
+	}
+
+	// 7. Validate that at least one output is defined. A SearchRule whose only
+	// purpose is to update its own status (without actionRef and without an
+	// enabled prometheusRule) silently produces nothing useful, so flag it.
+	// A non-nil but disabled prometheusRule does not count as an output.
+	hasPromRule := searchRuleResource.Spec.PrometheusRule != nil &&
+		searchRuleResource.Spec.PrometheusRule.Enabled
+	if searchRuleResource.Spec.ActionRef == nil && !hasPromRule {
+		// Drop any in-flight alert for this rule. Without this, removing
+		// actionRef on a firing SearchRule would leave a stale entry in the
+		// AlertsPool (Sync never runs because of the early return below) and
+		// the RulerAction controller would keep delivering it.
+		r.AlertsPool.Delete(fmt.Sprintf("%s_%s",
+			searchRuleResource.Namespace, searchRuleResource.Name))
+		r.UpdateConditionMissingOutput(searchRuleResource)
+		return ctrl.Result{}, errors.Join(prErr, fmt.Errorf("searchrule %s/%s has no actionRef nor enabled prometheusRule",
+			searchRuleResource.Namespace, searchRuleResource.Name))
+	}
+
+	// 8. Schedule periodical request
 	RequeueTime, err := time.ParseDuration(searchRuleResource.Spec.CheckInterval)
 	if err != nil {
 		logger.Info(fmt.Sprintf(controller.ResourceSyncTimeRetrievalError, controller.SearchRuleResourceType, req.NamespacedName, err.Error()))
-		return result, err
+		return result, errors.Join(prErr, err)
 	}
 	result = ctrl.Result{
 		RequeueAfter: RequeueTime,
 	}
 
-	// 7. Check the rule
-	err = r.Sync(ctx, watch.Modified, searchRuleResource)
-	if err != nil {
+	// 9. Check the rule
+	syncErr := r.Sync(ctx, watch.Modified, searchRuleResource)
+	if syncErr != nil {
 		r.UpdateConditionKubernetesApiCallFailure(searchRuleResource)
-		logger.Info(fmt.Sprintf(controller.SyncTargetError, controller.SearchRuleResourceType, req.NamespacedName, err.Error()))
-		return result, err
+		logger.Info(fmt.Sprintf(controller.SyncTargetError, controller.SearchRuleResourceType, req.NamespacedName, syncErr.Error()))
+		return result, errors.Join(prErr, syncErr)
 	}
 
-	// 8. Success, update the status
-	r.UpdateConditionSuccess(searchRuleResource)
+	// 10. Success, update the status (only when neither path failed)
+	if prErr == nil {
+		r.UpdateConditionSuccess(searchRuleResource)
+	}
 
-	return result, err
+	return result, prErr
 
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *SearchRuleReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	b := ctrl.NewControllerManagedBy(mgr).
 		For(&searchrulerv1alpha1.SearchRule{}).
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
-		Named("searchrule").
-		Complete(r)
+		Named("searchrule")
+	// Only watch PrometheusRule when the CRD exists, otherwise controller-runtime
+	// will fail to set up the informer with a NoMatch error.
+	if r.PrometheusRuleSupported {
+		b = b.Owns(&monitoringv1.PrometheusRule{}, builder.MatchEveryOwner)
+	}
+	return b.Complete(r)
 }

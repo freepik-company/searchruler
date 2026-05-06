@@ -96,7 +96,25 @@ spec:
     # Time window to check the condition. For example, if the condition is greaterThan 100 for 1m
     for: "15s"
 
+  # Optional: auto-generate a PrometheusRule (monitoring.coreos.com/v1) that
+  # mirrors this SearchRule's condition against the searchrule_value metric
+  # exposed by the operator. Requires the prometheus-operator CRDs to be
+  # installed in the cluster, plus the operator started with
+  # `--rules-metrics-bind-address` so the metric is actually scraped.
+  # When set, you can omit `actionRef` if you don't need a RulerAction.
+  # prometheusRule:
+  #   enabled: true
+  #   alertName: HighErrorRate           # Optional, defaults to the SearchRule name
+  #   labels:
+  #     severity: warning
+  #     team: platform
+  #   annotations:
+  #     summary: "High error rate detected"
+  #     runbook_url: "https://runbooks.example.com/high-errors"
+
   # RuleAction reference to execute when the condition is true.
+  # Optional when `prometheusRule.enabled: true` is set; at least one of
+  # `actionRef` or `prometheusRule` must be defined.
   actionRef:
     name: ruleraction-sample
     namespace: ""

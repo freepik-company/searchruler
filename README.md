@@ -58,6 +58,29 @@ resources:
 
 > 🧚🏼 **Hey, listen! If you prefer to deploy using Helm, go to the [Helm registry](https://prosimcorp.github.io/helm-charts/)**
 
+### Helm chart upgrade notes
+
+Starting with the version that introduces this layout, the chart manages CRDs through `templates/crds/` (controlled by `crds.install` and `crds.keep` in `values.yaml`) instead of the legacy `crds/` directory. This makes `helm upgrade` actually update the CRDs so new fields land on existing clusters — Helm never updates CRDs that live in the special `crds/` folder.
+
+If you installed a previous version of this chart, the CRDs already in your cluster were not created by Helm and will conflict on the first upgrade with `Error: rendered manifests contain a resource that already exists`. Adopt them into the release once before upgrading:
+
+```bash
+RELEASE=searchruler          # your helm release name
+NS=searchruler-system        # the namespace where you installed it
+
+for crd in clusterqueryconnectors clusterruleractions queryconnectors ruleractions searchrules; do
+  kubectl annotate crd "$crd.searchruler.freepik.com" \
+    meta.helm.sh/release-name="$RELEASE" \
+    meta.helm.sh/release-namespace="$NS" --overwrite
+  kubectl label crd "$crd.searchruler.freepik.com" \
+    app.kubernetes.io/managed-by=Helm --overwrite
+done
+
+helm upgrade "$RELEASE" searchruler/searchruler -n "$NS"
+```
+
+By default the chart sets `helm.sh/resource-policy: keep` on every CRD, so `helm uninstall` does not cascade-delete your `SearchRule`/`QueryConnector`/`RulerAction` instances. Set `crds.keep=false` if you want full teardown on uninstall.
+
 
 ## Flags
 
@@ -414,6 +437,45 @@ spec:
       {{ printf "Current value: %v" $value }}
 
 ```
+
+#### 📡 Auto-generate a PrometheusRule
+
+If your stack already runs the [prometheus-operator](https://github.com/prometheus-operator/prometheus-operator) plus Alertmanager, you don't need a `RulerAction` for the alert to land in Alertmanager — the operator can generate a `PrometheusRule` resource for you that mirrors the SearchRule's condition. The Prometheus Operator picks it up automatically and Prometheus evaluates the alert against the `searchrule_value` metric exposed by this operator.
+
+```yaml
+apiVersion: searchruler.freepik.com/v1alpha1
+kind: SearchRule
+metadata:
+  name: searchrule-prometheusrule-sample
+spec:
+  description: "High 5xx rate"
+  # ... queryConnectorRef, checkInterval, elasticsearch, condition as usual ...
+
+  prometheusRule:
+    enabled: true
+    # Optional. Defaults to the SearchRule's name.
+    alertName: HighErrorRate
+    labels:
+      severity: warning
+      team: platform
+    annotations:
+      summary: "High error rate on the application"
+      runbook_url: "https://runbooks.example.com/high-errors"
+
+  # actionRef is optional when prometheusRule is enabled. At least one of
+  # actionRef or prometheusRule MUST be defined.
+```
+
+Behavior:
+- The generated `PrometheusRule` is named after the SearchRule, lives in the same namespace, and is owned by the SearchRule (deleting the SearchRule garbage-collects the alert).
+- The PromQL expression is derived from `spec.condition`, e.g. `searchrule_value{searchrule_namespace="apps", rule="searchrule-prometheusrule-sample"} > 100`. The namespace label is exported as `searchrule_namespace` (not `namespace`) so it does not collide with the target label Prometheus injects when scraping via a ServiceMonitor.
+- The `for` window comes from `spec.condition.for`.
+- A `searchrule` label is added automatically to the alert so multiple SearchRules can share the same group in Alertmanager dashboards.
+
+Prerequisites and caveats:
+- The `monitoring.coreos.com/v1` PrometheusRule CRD must exist in the cluster. If it is missing, the SearchRule reports `PrometheusRule.Unsupported` in its `status.conditions` and no resource is created. The operator boot logs a warning at startup.
+- The custom-metrics endpoint must be enabled with `--rules-metrics-bind-address`, otherwise the underlying `searchrule_value` metric is never exported and the alert can never fire. In that case the SearchRule still gets a PrometheusRule, but it is marked with `PrometheusRule.MetricsNotExposed` in `status.conditions` so the misconfiguration is visible.
+- A `ServiceMonitor` (or `PodMonitor`) targeting the operator's metrics service must exist for Prometheus to actually scrape the metric. The chart's `controller.customMetrics.service` enables the Service; you provision the ServiceMonitor according to your Prometheus deployment.
 
 ## Templating engine
 

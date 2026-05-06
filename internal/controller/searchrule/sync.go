@@ -323,6 +323,16 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 	// Get ruleKey for the pool <namespace>_<name> and get rule from the pool if exists
 	// If not, create a default skeleton rule and save it to the pool
 	ruleKey := fmt.Sprintf("%s_%s", resource.Namespace, resource.Name)
+
+	// If the user removed actionRef while this rule was firing, the
+	// previously-enqueued alert would otherwise keep being notified by the
+	// RulerAction controller until the condition resolves. Drop it here so
+	// the change takes effect immediately on the next sync tick.
+	alertKey := ruleKey
+	if resource.Spec.ActionRef == nil {
+		r.AlertsPool.Delete(alertKey)
+	}
+
 	rule, ruleInPool := r.RulesPool.Get(ruleKey)
 	if !ruleInPool {
 		// Initialize rule with default values
@@ -361,25 +371,29 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 			rule.State = RuleFiringState
 			r.RulesPool.Set(ruleKey, rule)
 
-			// Add alert to the pool with the value, the object and the rulerAction name which will trigger the alert
-			alertKey := fmt.Sprintf("%s_%s", resource.Namespace, resource.Name)
-			r.AlertsPool.Set(alertKey, &pools.Alert{
-				RulerActionName: resource.Spec.ActionRef.Name,
-				SearchRule:      *resource,
-				Value:           conditionValue.Float(),
-				Aggregations:    aggregationsResource,
-			})
+			// Only enqueue the alert (and emit a Kubernetes Event for the
+			// RulerAction controller) when actionRef is configured. SearchRules
+			// that route exclusively through prometheusRule will skip this
+			// path; their alert lifecycle is owned by Prometheus + Alertmanager.
+			if resource.Spec.ActionRef != nil {
+				r.AlertsPool.Set(alertKey, &pools.Alert{
+					RulerActionName: resource.Spec.ActionRef.Name,
+					SearchRule:      *resource,
+					Value:           conditionValue.Float(),
+					Aggregations:    aggregationsResource,
+				})
 
-			// Create an event in Kubernetes of AlertFiring. This event will be readed by the RulerAction controller
-			// and will trigger the action inmediately
-			err = createKubeEvent(
-				ctx,
-				*resource,
-				kubeEventReasonAlertFiring,
-				fmt.Sprintf("Rule is in firing state. Current value is %v", conditionValue),
-			)
-			if err != nil {
-				return fmt.Errorf(controller.KubeEventCreationErrorMessage, err)
+				// Create an event in Kubernetes of AlertFiring. This event will be readed by the RulerAction controller
+				// and will trigger the action inmediately
+				err = createKubeEvent(
+					ctx,
+					*resource,
+					kubeEventReasonAlertFiring,
+					fmt.Sprintf("Rule is in firing state. Current value is %v", conditionValue),
+				)
+				if err != nil {
+					return fmt.Errorf(controller.KubeEventCreationErrorMessage, err)
+				}
 			}
 
 			// Log the alert and change the AlertStatus to Firing of the searchRule
@@ -412,7 +426,6 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 		if time.Since(rule.ResolvingTime) > forDuration {
 
 			// Remove alert from the pool
-			alertKey := fmt.Sprintf("%s_%s", resource.Namespace, resource.Name)
 			r.AlertsPool.Delete(alertKey)
 
 			// Restore rule to default values

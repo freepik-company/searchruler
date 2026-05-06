@@ -37,17 +37,22 @@ type RuleMetricT struct {
 }
 
 var (
-	// Basic metrics definition (global)
+	// Basic metrics definition (global). The namespace label is exported as
+	// `searchrule_namespace` rather than the more obvious `namespace` to
+	// avoid colliding with the target labels Prometheus injects when
+	// scraping via a ServiceMonitor. Prometheus' default conflict policy
+	// (honor_labels=false) would silently rename our `namespace` label to
+	// `exported_namespace`, breaking the PromQL the operator generates.
 	basicMetrics = map[string]RuleMetricT{
 		"searchrule_value": {
 			Name:   "searchrule_value",
 			Help:   "Value of the search rule",
-			Labels: []string{"rule"},
+			Labels: []string{"searchrule_namespace", "rule"},
 		},
 		"searchrule_state": {
 			Name:   "searchrule_state",
 			Help:   "State of the search rule",
-			Labels: []string{"rule", "state"},
+			Labels: []string{"searchrule_namespace", "rule", "state"},
 		},
 	}
 
@@ -135,20 +140,24 @@ func updateMetrics(rulesPool *pools.RulesStore) (err error) {
 	// Get all the rules from the pool
 	rules := rulesPool.GetAll()
 
-	// At the end, update the default metrics values
+	// At the end, update the default metrics values. The first positional
+	// argument matches the `searchrule_namespace` label declared above; we
+	// keep using the SearchRule's namespace there.
 	for name, metric := range defaultRuleMetrics {
 		for _, rule := range rules {
+			ns := rule.SearchRule.Namespace
+			ruleName := rule.SearchRule.Name
 			switch name {
 			case "searchrule_value":
-				metric.WithLabelValues(rule.SearchRule.Name).Set(float64(rule.Value))
+				metric.WithLabelValues(ns, ruleName).Set(float64(rule.Value))
 			case "searchrule_state":
 				// Set the state of the rule with 1 if it's the same as the state in the ruleStates array
 				for _, state := range ruleStates {
 					if rule.State == state {
-						metric.WithLabelValues(rule.SearchRule.Name, state).Set(1)
+						metric.WithLabelValues(ns, ruleName, state).Set(1)
 						continue
 					}
-					metric.WithLabelValues(rule.SearchRule.Name, state).Set(0)
+					metric.WithLabelValues(ns, ruleName, state).Set(0)
 				}
 			}
 		}

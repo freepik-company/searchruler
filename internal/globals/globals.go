@@ -81,6 +81,25 @@ const (
 	// No certificates found
 	ConditionReasonNoCertsFoundType    = "NoCertsFound"
 	ConditionReasonNoCertsFoundMessage = "No certificates found in secret"
+
+	// PrometheusRule output condition
+	ConditionTypePrometheusRule = "PrometheusRule"
+
+	ConditionReasonPrometheusRuleSyncedType    = "Synced"
+	ConditionReasonPrometheusRuleSyncedMessage = "PrometheusRule resource is in sync with the SearchRule"
+
+	ConditionReasonPrometheusRuleUnsupportedType    = "Unsupported"
+	ConditionReasonPrometheusRuleUnsupportedMessage = "monitoring.coreos.com/v1 PrometheusRule CRD was not installed in the cluster when the operator started; install the CRD and restart the operator to pick up the change"
+
+	ConditionReasonPrometheusRuleMetricsNotExposedType    = "MetricsNotExposed"
+	ConditionReasonPrometheusRuleMetricsNotExposedMessage = "PrometheusRule was created but the searchrule_value metric is not exposed (--rules-metrics-bind-address=0); alerts will not fire until the operator exposes its custom metrics"
+
+	ConditionReasonPrometheusRuleErrorType    = "PrometheusRuleError"
+	ConditionReasonPrometheusRuleErrorMessage = "Failed to reconcile the PrometheusRule resource"
+
+	// At least one of actionRef or prometheusRule must be defined
+	ConditionReasonMissingOutputType    = "MissingOutput"
+	ConditionReasonMissingOutputMessage = "SearchRule has neither actionRef nor prometheusRule defined; at least one is required"
 )
 
 var (
@@ -124,4 +143,20 @@ func UpdateCondition(conditions *[]metav1.Condition, condition metav1.Condition)
 		currentCondition.Message = condition.Message
 		currentCondition.LastTransitionTime = metav1.Now()
 	}
+}
+
+// RemoveCondition drops any condition with the given type from the slice.
+// Useful when a feature toggle flips off and we want to keep the status free
+// of stale information.
+func RemoveCondition(conditions *[]metav1.Condition, condType string) {
+	if conditions == nil {
+		return
+	}
+	out := (*conditions)[:0]
+	for _, c := range *conditions {
+		if c.Type != condType {
+			out = append(out, c)
+		}
+	}
+	*conditions = out
 }

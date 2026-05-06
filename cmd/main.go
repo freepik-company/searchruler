@@ -22,12 +22,17 @@ import (
 	"flag"
 	"os"
 
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -146,7 +151,34 @@ func main() {
 		metricsServerOptions.FilterProvider = filters.WithAuthenticationAndAuthorization
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	cfg := ctrl.GetConfigOrDie()
+
+	// Detect whether the prometheus-operator PrometheusRule CRD is installed
+	// in the cluster. The feature that auto-generates PrometheusRule resources
+	// from a SearchRule is opt-in per resource, but we need to know up-front
+	// whether to register the scheme and whether to set up an Owns() watch.
+	prometheusRuleSupported := isPrometheusRuleCRDInstalled(cfg)
+	if prometheusRuleSupported {
+		utilruntime.Must(monitoringv1.AddToScheme(scheme))
+	} else {
+		setupLog.Info("PrometheusRule CRD (monitoring.coreos.com/v1) not found in the cluster; " +
+			"SearchRule.spec.prometheusRule will be reported as unsupported on resources that request it. " +
+			"Detection runs only at startup: install the CRD first, then restart the operator")
+	}
+
+	// The PrometheusRule, when generated, alerts on the searchrule_value
+	// metric. That metric is only exposed when --rules-metrics-bind-address
+	// is set (it defaults to "0", which disables the server). Warn loudly
+	// here so operators who turn on prometheusRule without enabling the
+	// custom metrics endpoint understand why their alerts never fire.
+	metricsExposed := rulesMetricsAddr != "0"
+	if !metricsExposed {
+		setupLog.Info("WARNING: --rules-metrics-bind-address is disabled (\"0\"); " +
+			"any SearchRule that enables spec.prometheusRule will produce a PrometheusRule " +
+			"pointing at a metric that is not exposed by this operator")
+	}
+
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOptions,
 		WebhookServer:          webhookServer,
@@ -210,6 +242,8 @@ func main() {
 		QueryConnectorCredentialsPool: QueryConnectorCredentialsPool,
 		RulesPool:                     RulesPool,
 		AlertsPool:                    AlertsPool,
+		PrometheusRuleSupported:       prometheusRuleSupported,
+		MetricsExposed:                metricsExposed,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SearchRule")
 		os.Exit(1)
@@ -238,4 +272,32 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+// isPrometheusRuleCRDInstalled returns true when the apiserver advertises the
+// monitoring.coreos.com/v1 PrometheusRule resource, i.e. when the
+// prometheus-operator CRDs are installed in the cluster. A failure to reach
+// the discovery API is treated as "not installed" so the operator boots
+// gracefully on bare or restricted clusters.
+func isPrometheusRuleCRDInstalled(cfg *rest.Config) bool {
+	dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		setupLog.Error(err, "failed to build discovery client; assuming PrometheusRule CRD is not installed")
+		return false
+	}
+	gv := schema.GroupVersion{Group: monitoringv1.SchemeGroupVersion.Group, Version: monitoringv1.SchemeGroupVersion.Version}
+	resources, err := dc.ServerResourcesForGroupVersion(gv.String())
+	if err != nil {
+		if apierrors.IsNotFound(err) || discovery.IsGroupDiscoveryFailedError(err) {
+			return false
+		}
+		setupLog.Error(err, "failed to discover monitoring.coreos.com/v1; assuming PrometheusRule CRD is not installed")
+		return false
+	}
+	for _, r := range resources.APIResources {
+		if r.Kind == "PrometheusRule" {
+			return true
+		}
+	}
+	return false
 }
