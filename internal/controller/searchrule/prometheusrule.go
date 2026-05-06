@@ -161,9 +161,13 @@ func buildAlertingRule(rule *v1alpha1.SearchRule, expr string, forDuration monit
 		alertName = rule.Spec.PrometheusRule.AlertName
 	}
 
+	// We expose the SearchRule's own namespace under `searchrule_namespace`
+	// rather than `namespace` for the same reason as the underlying metric:
+	// avoid the ServiceMonitor target-label collision that turns `namespace`
+	// into `exported_namespace` on the Prometheus side.
 	labels := map[string]string{
 		promRuleSearchRuleLabel: rule.Name,
-		"namespace":             rule.Namespace,
+		"searchrule_namespace":  rule.Namespace,
 	}
 	if rule.Spec.PrometheusRule != nil {
 		labels = mergeLabels(labels, rule.Spec.PrometheusRule.Labels)
@@ -191,9 +195,11 @@ func buildAlertingRule(rule *v1alpha1.SearchRule, expr string, forDuration monit
 
 // buildPromQLExpr translates a SearchRule's condition into a PromQL
 // expression on the searchrule_value metric exposed by the operator.
-// The selector includes both namespace and rule labels because SearchRule
-// names are unique only within a namespace, so two rules with the same name
-// in different namespaces would otherwise share the same time series.
+// The selector includes both searchrule_namespace and rule labels because
+// SearchRule names are unique only within a namespace, so two rules with the
+// same name in different namespaces would otherwise share the same time
+// series. The label is `searchrule_namespace` (not `namespace`) to avoid the
+// ServiceMonitor target-label collision described in metrics.go.
 func buildPromQLExpr(rule *v1alpha1.SearchRule) (string, error) {
 	op, err := promqlOperator(rule.Spec.Condition.Operator)
 	if err != nil {
@@ -203,7 +209,7 @@ func buildPromQLExpr(rule *v1alpha1.SearchRule) (string, error) {
 	if threshold == "" {
 		return "", fmt.Errorf("condition.threshold is empty")
 	}
-	return fmt.Sprintf(`searchrule_value{namespace=%q,rule=%q} %s %s`,
+	return fmt.Sprintf(`searchrule_value{searchrule_namespace=%q,rule=%q} %s %s`,
 		rule.Namespace, rule.Name, op, threshold), nil
 }
 

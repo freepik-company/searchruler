@@ -109,12 +109,12 @@ func TestBuildPromQLExpr(t *testing.T) {
 		{
 			name:      "greaterThan",
 			condition: searchrulerv1alpha1.Condition{Operator: conditionGreaterThan, Threshold: "100", For: "1m"},
-			want:      `searchrule_value{namespace="default",rule="demo"} > 100`,
+			want:      `searchrule_value{searchrule_namespace="default",rule="demo"} > 100`,
 		},
 		{
 			name:      "lessThanOrEqual with decimal threshold",
 			condition: searchrulerv1alpha1.Condition{Operator: conditionLessThanOrEqual, Threshold: "0.5", For: "30s"},
-			want:      `searchrule_value{namespace="default",rule="demo"} <= 0.5`,
+			want:      `searchrule_value{searchrule_namespace="default",rule="demo"} <= 0.5`,
 		},
 		{
 			name:      "empty threshold",
@@ -323,7 +323,7 @@ func TestReconcilePrometheusRule_Enabled_CreatesResourceWithOwnerRef(t *testing.
 	if r0.Alert != "MyAlert" {
 		t.Fatalf("alert name mismatch: got=%q", r0.Alert)
 	}
-	wantExpr := `searchrule_value{namespace="default",rule="demo"} > 100`
+	wantExpr := `searchrule_value{searchrule_namespace="default",rule="demo"} > 100`
 	if r0.Expr.String() != wantExpr {
 		t.Fatalf("expr mismatch: got=%q want=%q", r0.Expr.String(), wantExpr)
 	}

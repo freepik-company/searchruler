@@ -37,20 +37,22 @@ type RuleMetricT struct {
 }
 
 var (
-	// Basic metrics definition (global). Labels include both `namespace` and
-	// `rule` so SearchRules with the same name in different namespaces remain
-	// distinguishable in Prometheus and in the auto-generated PrometheusRule
-	// expressions.
+	// Basic metrics definition (global). The namespace label is exported as
+	// `searchrule_namespace` rather than the more obvious `namespace` to
+	// avoid colliding with the target labels Prometheus injects when
+	// scraping via a ServiceMonitor. Prometheus' default conflict policy
+	// (honor_labels=false) would silently rename our `namespace` label to
+	// `exported_namespace`, breaking the PromQL the operator generates.
 	basicMetrics = map[string]RuleMetricT{
 		"searchrule_value": {
 			Name:   "searchrule_value",
 			Help:   "Value of the search rule",
-			Labels: []string{"namespace", "rule"},
+			Labels: []string{"searchrule_namespace", "rule"},
 		},
 		"searchrule_state": {
 			Name:   "searchrule_state",
 			Help:   "State of the search rule",
-			Labels: []string{"namespace", "rule", "state"},
+			Labels: []string{"searchrule_namespace", "rule", "state"},
 		},
 	}
 
@@ -138,7 +140,9 @@ func updateMetrics(rulesPool *pools.RulesStore) (err error) {
 	// Get all the rules from the pool
 	rules := rulesPool.GetAll()
 
-	// At the end, update the default metrics values
+	// At the end, update the default metrics values. The first positional
+	// argument matches the `searchrule_namespace` label declared above; we
+	// keep using the SearchRule's namespace there.
 	for name, metric := range defaultRuleMetrics {
 		for _, rule := range rules {
 			ns := rule.SearchRule.Namespace

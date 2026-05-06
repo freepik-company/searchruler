@@ -468,7 +468,7 @@ spec:
 
 Behavior:
 - The generated `PrometheusRule` is named after the SearchRule, lives in the same namespace, and is owned by the SearchRule (deleting the SearchRule garbage-collects the alert).
-- The PromQL expression is derived from `spec.condition`, e.g. `searchrule_value{rule="searchrule-prometheusrule-sample"} > 100`.
+- The PromQL expression is derived from `spec.condition`, e.g. `searchrule_value{searchrule_namespace="apps", rule="searchrule-prometheusrule-sample"} > 100`. The namespace label is exported as `searchrule_namespace` (not `namespace`) so it does not collide with the target label Prometheus injects when scraping via a ServiceMonitor.
 - The `for` window comes from `spec.condition.for`.
 - A `searchrule` label is added automatically to the alert so multiple SearchRules can share the same group in Alertmanager dashboards.
 
