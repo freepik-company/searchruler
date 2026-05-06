@@ -18,6 +18,7 @@ package searchrule
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -143,10 +144,15 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// returned earlier on MissingOutput, a previously-created PrometheusRule
 	// would survive in the cluster and keep firing alerts even though the
 	// SearchRule no longer defines any active output.
-	if err := r.reconcilePrometheusRule(ctx, searchRuleResource); err != nil {
+	//
+	// We do NOT return on a PrometheusRule failure: the actionRef output is
+	// independent and must keep working when the prometheus-operator side
+	// has a transient API error or a name conflict. The error is collected
+	// so controller-runtime still requeues with backoff.
+	prErr := r.reconcilePrometheusRule(ctx, searchRuleResource)
+	if prErr != nil {
 		logger.Info(fmt.Sprintf("failed to reconcile PrometheusRule for %s: %s",
-			req.NamespacedName, err.Error()))
-		return result, err
+			req.NamespacedName, prErr.Error()))
 	}
 
 	// 7. Validate that at least one output is defined. A SearchRule whose only
@@ -163,32 +169,34 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		r.AlertsPool.Delete(fmt.Sprintf("%s_%s",
 			searchRuleResource.Namespace, searchRuleResource.Name))
 		r.UpdateConditionMissingOutput(searchRuleResource)
-		return ctrl.Result{}, fmt.Errorf("searchrule %s/%s has no actionRef nor enabled prometheusRule",
-			searchRuleResource.Namespace, searchRuleResource.Name)
+		return ctrl.Result{}, errors.Join(prErr, fmt.Errorf("searchrule %s/%s has no actionRef nor enabled prometheusRule",
+			searchRuleResource.Namespace, searchRuleResource.Name))
 	}
 
 	// 8. Schedule periodical request
 	RequeueTime, err := time.ParseDuration(searchRuleResource.Spec.CheckInterval)
 	if err != nil {
 		logger.Info(fmt.Sprintf(controller.ResourceSyncTimeRetrievalError, controller.SearchRuleResourceType, req.NamespacedName, err.Error()))
-		return result, err
+		return result, errors.Join(prErr, err)
 	}
 	result = ctrl.Result{
 		RequeueAfter: RequeueTime,
 	}
 
 	// 9. Check the rule
-	err = r.Sync(ctx, watch.Modified, searchRuleResource)
-	if err != nil {
+	syncErr := r.Sync(ctx, watch.Modified, searchRuleResource)
+	if syncErr != nil {
 		r.UpdateConditionKubernetesApiCallFailure(searchRuleResource)
-		logger.Info(fmt.Sprintf(controller.SyncTargetError, controller.SearchRuleResourceType, req.NamespacedName, err.Error()))
-		return result, err
+		logger.Info(fmt.Sprintf(controller.SyncTargetError, controller.SearchRuleResourceType, req.NamespacedName, syncErr.Error()))
+		return result, errors.Join(prErr, syncErr)
 	}
 
-	// 10. Success, update the status
-	r.UpdateConditionSuccess(searchRuleResource)
+	// 10. Success, update the status (only when neither path failed)
+	if prErr == nil {
+		r.UpdateConditionSuccess(searchRuleResource)
+	}
 
-	return result, err
+	return result, prErr
 
 }
 

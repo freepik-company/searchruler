@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -157,7 +158,12 @@ func (r *SearchRuleReconciler) reconcilePrometheusRule(ctx context.Context, rule
 // buildAlertingRule renders the single alerting rule embedded in the
 // PrometheusRule for this SearchRule.
 func buildAlertingRule(rule *v1alpha1.SearchRule, expr string, forDuration monitoringv1.Duration) monitoringv1.Rule {
-	alertName := rule.Name
+	// Prometheus accepts metric/alert names matching [a-zA-Z_:][a-zA-Z0-9_:]*
+	// while Kubernetes resource names commonly include hyphens. Default to
+	// the SearchRule name with hyphens swapped for underscores so the rule
+	// loads on the Prometheus side without needing the user to set
+	// alertName explicitly.
+	alertName := defaultAlertName(rule.Name)
 	if rule.Spec.PrometheusRule != nil && rule.Spec.PrometheusRule.AlertName != "" {
 		alertName = rule.Spec.PrometheusRule.AlertName
 	}
@@ -290,6 +296,14 @@ func isOwnedByThisSearchRule(pr *monitoringv1.PrometheusRule, rule *v1alpha1.Sea
 		}
 	}
 	return false
+}
+
+// defaultAlertName converts a Kubernetes resource name into something that
+// Prometheus accepts as an alert name (`[a-zA-Z_:][a-zA-Z0-9_:]*`). Kubernetes
+// names are limited to `[a-z0-9-]`, so swapping hyphens for underscores is
+// enough; the result keeps the original casing and digits.
+func defaultAlertName(name string) string {
+	return strings.ReplaceAll(name, "-", "_")
 }
 
 // mergeLabels returns a new map containing all keys from base, with values

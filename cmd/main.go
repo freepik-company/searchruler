@@ -162,7 +162,8 @@ func main() {
 		utilruntime.Must(monitoringv1.AddToScheme(scheme))
 	} else {
 		setupLog.Info("PrometheusRule CRD (monitoring.coreos.com/v1) not found in the cluster; " +
-			"SearchRule.spec.prometheusRule will be reported as unsupported on resources that request it")
+			"SearchRule.spec.prometheusRule will be reported as unsupported on resources that request it. " +
+			"Detection runs only at startup: install the CRD first, then restart the operator")
 	}
 
 	// The PrometheusRule, when generated, alerts on the searchrule_value

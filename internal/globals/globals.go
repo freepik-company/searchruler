@@ -89,7 +89,7 @@ const (
 	ConditionReasonPrometheusRuleSyncedMessage = "PrometheusRule resource is in sync with the SearchRule"
 
 	ConditionReasonPrometheusRuleUnsupportedType    = "Unsupported"
-	ConditionReasonPrometheusRuleUnsupportedMessage = "monitoring.coreos.com/v1 PrometheusRule CRD is not installed in the cluster"
+	ConditionReasonPrometheusRuleUnsupportedMessage = "monitoring.coreos.com/v1 PrometheusRule CRD was not installed in the cluster when the operator started; install the CRD and restart the operator to pick up the change"
 
 	ConditionReasonPrometheusRuleMetricsNotExposedType    = "MetricsNotExposed"
 	ConditionReasonPrometheusRuleMetricsNotExposedMessage = "PrometheusRule was created but the searchrule_value metric is not exposed (--rules-metrics-bind-address=0); alerts will not fire until the operator exposes its custom metrics"

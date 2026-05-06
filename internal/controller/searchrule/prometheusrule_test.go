@@ -254,8 +254,42 @@ func TestBuildAlertingRule_DefaultAlertName(t *testing.T) {
 		r.Spec.PrometheusRule = &searchrulerv1alpha1.PrometheusRuleSpec{Enabled: true}
 	})
 	got := buildAlertingRule(rule, "expr", monitoringv1.Duration("1m"))
+	// Default alert name equals the SearchRule name (no hyphens to swap).
 	if got.Alert != rule.Name {
 		t.Fatalf("Alert=%q want=%q (SearchRule name)", got.Alert, rule.Name)
+	}
+}
+
+func TestBuildAlertingRule_DefaultAlertNameSanitizesHyphens(t *testing.T) {
+	t.Parallel()
+	rule := newSearchRule(func(r *searchrulerv1alpha1.SearchRule) {
+		r.Name = "high-error-rate"
+		r.Spec.PrometheusRule = &searchrulerv1alpha1.PrometheusRuleSpec{Enabled: true}
+	})
+	got := buildAlertingRule(rule, "expr", monitoringv1.Duration("1m"))
+	want := "high_error_rate"
+	if got.Alert != want {
+		t.Fatalf("Alert=%q want=%q (sanitized)", got.Alert, want)
+	}
+}
+
+func TestDefaultAlertName(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		"plain":            "plain",
+		"with-hyphens":     "with_hyphens",
+		"multi-word-name":  "multi_word_name",
+		"already_safe":     "already_safe",
+		"123-leading-num":  "123_leading_num", // K8s allows but Prometheus rejects leading digit; user must set alertName for that edge
+	}
+	for in, want := range cases {
+		in, want := in, want
+		t.Run(in, func(t *testing.T) {
+			t.Parallel()
+			if got := defaultAlertName(in); got != want {
+				t.Fatalf("got=%q want=%q", got, want)
+			}
+		})
 	}
 }
 
