@@ -109,12 +109,12 @@ func TestBuildPromQLExpr(t *testing.T) {
 		{
 			name:      "greaterThan",
 			condition: searchrulerv1alpha1.Condition{Operator: conditionGreaterThan, Threshold: "100", For: "1m"},
-			want:      `searchrule_value{rule="demo"} > 100`,
+			want:      `searchrule_value{namespace="default",rule="demo"} > 100`,
 		},
 		{
 			name:      "lessThanOrEqual with decimal threshold",
 			condition: searchrulerv1alpha1.Condition{Operator: conditionLessThanOrEqual, Threshold: "0.5", For: "30s"},
-			want:      `searchrule_value{rule="demo"} <= 0.5`,
+			want:      `searchrule_value{namespace="default",rule="demo"} <= 0.5`,
 		},
 		{
 			name:      "empty threshold",
@@ -323,7 +323,7 @@ func TestReconcilePrometheusRule_Enabled_CreatesResourceWithOwnerRef(t *testing.
 	if r0.Alert != "MyAlert" {
 		t.Fatalf("alert name mismatch: got=%q", r0.Alert)
 	}
-	wantExpr := `searchrule_value{rule="demo"} > 100`
+	wantExpr := `searchrule_value{namespace="default",rule="demo"} > 100`
 	if r0.Expr.String() != wantExpr {
 		t.Fatalf("expr mismatch: got=%q want=%q", r0.Expr.String(), wantExpr)
 	}
@@ -379,6 +379,65 @@ func TestReconcilePrometheusRule_DisabledAfterEnabled_DeletesResource(t *testing
 	pr := &monitoringv1.PrometheusRule{}
 	if err := c.Get(context.Background(), types.NamespacedName{Namespace: rule.Namespace, Name: rule.Name}, pr); !apierrors.IsNotFound(err) {
 		t.Fatalf("expected PrometheusRule to be deleted, got err=%v", err)
+	}
+}
+
+func TestReconcilePrometheusRule_RefusesToAdoptUnmanagedResource(t *testing.T) {
+	t.Parallel()
+	scheme := newScheme(t)
+
+	// A PrometheusRule named "demo" already exists, owned by some other
+	// controller (or by nothing at all). The operator must NOT take it over.
+	pre := &monitoringv1.PrometheusRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "demo",
+			Namespace: "default",
+			Labels:    map[string]string{"managed-by": "human"},
+		},
+	}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pre).Build()
+	r := &SearchRuleReconciler{Client: c, Scheme: scheme, PrometheusRuleSupported: true, MetricsExposed: true}
+
+	rule := newSearchRule(func(sr *searchrulerv1alpha1.SearchRule) {
+		sr.Spec.PrometheusRule = &searchrulerv1alpha1.PrometheusRuleSpec{Enabled: true}
+	})
+	err := r.reconcilePrometheusRule(context.Background(), rule)
+	if err == nil {
+		t.Fatalf("expected error when PrometheusRule is not owned by the SearchRule")
+	}
+
+	// Original resource untouched: same labels, no controller owner.
+	got := &monitoringv1.PrometheusRule{}
+	if err := c.Get(context.Background(), types.NamespacedName{Namespace: "default", Name: "demo"}, got); err != nil {
+		t.Fatalf("get pre-existing PR: %v", err)
+	}
+	if got.Labels["managed-by"] != "human" {
+		t.Fatalf("operator overwrote a foreign PrometheusRule: labels=%v", got.Labels)
+	}
+	if len(got.Spec.Groups) != 0 {
+		t.Fatalf("operator overwrote a foreign PrometheusRule spec: groups=%v", got.Spec.Groups)
+	}
+	if !hasCondition(rule.Status.Conditions, "PrometheusRule", "PrometheusRuleError") {
+		t.Fatalf("expected PrometheusRuleError condition, got=%v", rule.Status.Conditions)
+	}
+}
+
+func TestDeletePrometheusRuleIfExists_SkipsUnmanagedResource(t *testing.T) {
+	t.Parallel()
+	scheme := newScheme(t)
+	pre := &monitoringv1.PrometheusRule{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+	}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pre).Build()
+	r := &SearchRuleReconciler{Client: c, Scheme: scheme, PrometheusRuleSupported: true, MetricsExposed: true}
+
+	rule := newSearchRule(nil) // no PrometheusRule spec — would normally trigger cleanup
+	if err := r.reconcilePrometheusRule(context.Background(), rule); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got := &monitoringv1.PrometheusRule{}
+	if err := c.Get(context.Background(), types.NamespacedName{Namespace: "default", Name: "demo"}, got); err != nil {
+		t.Fatalf("expected the foreign PrometheusRule to remain, got err=%v", err)
 	}
 }
 

@@ -124,20 +124,28 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
-	// 5. Update the status before the requeue
+	// 5. Update the status before the requeue. We must not overwrite the
+	// outer `err` here, otherwise a transient PrometheusRule/Sync failure
+	// would be hidden by a successful status update and the controller
+	// would not retry until the spec changes.
 	defer func() {
-		err = r.Status().Update(ctx, searchRuleResource)
-		if err != nil {
-			logger.Info(fmt.Sprintf(controller.ResourceConditionUpdateError, controller.SearchRuleResourceType, req.NamespacedName, err.Error()))
+		if statusErr := r.Status().Update(ctx, searchRuleResource); statusErr != nil {
+			logger.Info(fmt.Sprintf(controller.ResourceConditionUpdateError, controller.SearchRuleResourceType, req.NamespacedName, statusErr.Error()))
+			if err == nil {
+				err = statusErr
+			}
 		}
 	}()
 
 	// 6. Validate that at least one output is defined. A SearchRule whose only
-	// purpose is to update its own status (without actionRef and without
-	// prometheusRule) silently produces nothing useful, so flag it.
-	if searchRuleResource.Spec.ActionRef == nil && searchRuleResource.Spec.PrometheusRule == nil {
+	// purpose is to update its own status (without actionRef and without an
+	// enabled prometheusRule) silently produces nothing useful, so flag it.
+	// A non-nil but disabled prometheusRule does not count as an output.
+	hasPromRule := searchRuleResource.Spec.PrometheusRule != nil &&
+		searchRuleResource.Spec.PrometheusRule.Enabled
+	if searchRuleResource.Spec.ActionRef == nil && !hasPromRule {
 		r.UpdateConditionMissingOutput(searchRuleResource)
-		return ctrl.Result{}, fmt.Errorf("searchrule %s/%s has no actionRef nor prometheusRule defined",
+		return ctrl.Result{}, fmt.Errorf("searchrule %s/%s has no actionRef nor enabled prometheusRule",
 			searchRuleResource.Namespace, searchRuleResource.Name)
 	}
 

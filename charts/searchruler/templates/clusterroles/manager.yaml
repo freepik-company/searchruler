@@ -63,3 +63,20 @@ rules:
   - get
   - patch
   - update
+# Optional: permissions to manage PrometheusRule resources owned by SearchRules.
+# These are only used when the prometheus-operator CRDs are installed in the
+# cluster and a SearchRule opts into spec.prometheusRule. They are listed here
+# because the controller still attempts to discover the CRD on every reconcile
+# even when no SearchRule currently uses the feature.
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - prometheusrules
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch

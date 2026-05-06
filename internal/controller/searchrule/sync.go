@@ -323,6 +323,16 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 	// Get ruleKey for the pool <namespace>_<name> and get rule from the pool if exists
 	// If not, create a default skeleton rule and save it to the pool
 	ruleKey := fmt.Sprintf("%s_%s", resource.Namespace, resource.Name)
+
+	// If the user removed actionRef while this rule was firing, the
+	// previously-enqueued alert would otherwise keep being notified by the
+	// RulerAction controller until the condition resolves. Drop it here so
+	// the change takes effect immediately on the next sync tick.
+	alertKey := ruleKey
+	if resource.Spec.ActionRef == nil {
+		r.AlertsPool.Delete(alertKey)
+	}
+
 	rule, ruleInPool := r.RulesPool.Get(ruleKey)
 	if !ruleInPool {
 		// Initialize rule with default values
@@ -366,7 +376,6 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 			// that route exclusively through prometheusRule will skip this
 			// path; their alert lifecycle is owned by Prometheus + Alertmanager.
 			if resource.Spec.ActionRef != nil {
-				alertKey := fmt.Sprintf("%s_%s", resource.Namespace, resource.Name)
 				r.AlertsPool.Set(alertKey, &pools.Alert{
 					RulerActionName: resource.Spec.ActionRef.Name,
 					SearchRule:      *resource,
@@ -417,7 +426,6 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 		if time.Since(rule.ResolvingTime) > forDuration {
 
 			// Remove alert from the pool
-			alertKey := fmt.Sprintf("%s_%s", resource.Namespace, resource.Name)
 			r.AlertsPool.Delete(alertKey)
 
 			// Restore rule to default values

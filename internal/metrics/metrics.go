@@ -37,17 +37,20 @@ type RuleMetricT struct {
 }
 
 var (
-	// Basic metrics definition (global)
+	// Basic metrics definition (global). Labels include both `namespace` and
+	// `rule` so SearchRules with the same name in different namespaces remain
+	// distinguishable in Prometheus and in the auto-generated PrometheusRule
+	// expressions.
 	basicMetrics = map[string]RuleMetricT{
 		"searchrule_value": {
 			Name:   "searchrule_value",
 			Help:   "Value of the search rule",
-			Labels: []string{"rule"},
+			Labels: []string{"namespace", "rule"},
 		},
 		"searchrule_state": {
 			Name:   "searchrule_state",
 			Help:   "State of the search rule",
-			Labels: []string{"rule", "state"},
+			Labels: []string{"namespace", "rule", "state"},
 		},
 	}
 
@@ -138,17 +141,19 @@ func updateMetrics(rulesPool *pools.RulesStore) (err error) {
 	// At the end, update the default metrics values
 	for name, metric := range defaultRuleMetrics {
 		for _, rule := range rules {
+			ns := rule.SearchRule.Namespace
+			ruleName := rule.SearchRule.Name
 			switch name {
 			case "searchrule_value":
-				metric.WithLabelValues(rule.SearchRule.Name).Set(float64(rule.Value))
+				metric.WithLabelValues(ns, ruleName).Set(float64(rule.Value))
 			case "searchrule_state":
 				// Set the state of the rule with 1 if it's the same as the state in the ruleStates array
 				for _, state := range ruleStates {
 					if rule.State == state {
-						metric.WithLabelValues(rule.SearchRule.Name, state).Set(1)
+						metric.WithLabelValues(ns, ruleName, state).Set(1)
 						continue
 					}
-					metric.WithLabelValues(rule.SearchRule.Name, state).Set(0)
+					metric.WithLabelValues(ns, ruleName, state).Set(0)
 				}
 			}
 		}

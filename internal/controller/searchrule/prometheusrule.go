@@ -95,11 +95,26 @@ func (r *SearchRuleReconciler) reconcilePrometheusRule(ctx context.Context, rule
 		return fmt.Errorf("failed to parse condition.for: %w", err)
 	}
 
-	pr := &monitoringv1.PrometheusRule{
-		ObjectMeta: metav1.ObjectMeta{
+	// Refuse to adopt a PrometheusRule that already exists with a different
+	// (or missing) owner. We never want to silently take ownership of a
+	// resource a human created by hand and then later delete it.
+	pr := &monitoringv1.PrometheusRule{}
+	getErr := r.Get(ctx, types.NamespacedName{Namespace: rule.Namespace, Name: rule.Name}, pr)
+	switch {
+	case apierrors.IsNotFound(getErr):
+		pr = &monitoringv1.PrometheusRule{ObjectMeta: metav1.ObjectMeta{
 			Name:      rule.Name,
 			Namespace: rule.Namespace,
-		},
+		}}
+	case getErr != nil:
+		r.UpdateConditionPrometheusRuleError(rule, getErr.Error())
+		return fmt.Errorf("failed to fetch PrometheusRule: %w", getErr)
+	default:
+		if !isOwnedByThisSearchRule(pr, rule) {
+			msg := fmt.Sprintf("a PrometheusRule named %q already exists and is not managed by this SearchRule; refusing to overwrite it", pr.Name)
+			r.UpdateConditionPrometheusRuleError(rule, msg)
+			return fmt.Errorf("%s", msg)
+		}
 	}
 
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, pr, func() error {
@@ -107,7 +122,7 @@ func (r *SearchRuleReconciler) reconcilePrometheusRule(ctx context.Context, rule
 			return err
 		}
 		pr.Labels = mergeLabels(pr.Labels, map[string]string{
-			promRuleManagedLabel:   promRuleManagedValue,
+			promRuleManagedLabel:           promRuleManagedValue,
 			"app.kubernetes.io/managed-by": "searchruler",
 		})
 		pr.Spec = monitoringv1.PrometheusRuleSpec{
@@ -141,7 +156,10 @@ func buildAlertingRule(rule *v1alpha1.SearchRule, expr string, forDuration monit
 		alertName = rule.Spec.PrometheusRule.AlertName
 	}
 
-	labels := map[string]string{promRuleSearchRuleLabel: rule.Name}
+	labels := map[string]string{
+		promRuleSearchRuleLabel: rule.Name,
+		"namespace":             rule.Namespace,
+	}
 	if rule.Spec.PrometheusRule != nil {
 		labels = mergeLabels(labels, rule.Spec.PrometheusRule.Labels)
 	}
@@ -168,6 +186,9 @@ func buildAlertingRule(rule *v1alpha1.SearchRule, expr string, forDuration monit
 
 // buildPromQLExpr translates a SearchRule's condition into a PromQL
 // expression on the searchrule_value metric exposed by the operator.
+// The selector includes both namespace and rule labels because SearchRule
+// names are unique only within a namespace, so two rules with the same name
+// in different namespaces would otherwise share the same time series.
 func buildPromQLExpr(rule *v1alpha1.SearchRule) (string, error) {
 	op, err := promqlOperator(rule.Spec.Condition.Operator)
 	if err != nil {
@@ -177,7 +198,8 @@ func buildPromQLExpr(rule *v1alpha1.SearchRule) (string, error) {
 	if threshold == "" {
 		return "", fmt.Errorf("condition.threshold is empty")
 	}
-	return fmt.Sprintf(`searchrule_value{rule=%q} %s %s`, rule.Name, op, threshold), nil
+	return fmt.Sprintf(`searchrule_value{namespace=%q,rule=%q} %s %s`,
+		rule.Namespace, rule.Name, op, threshold), nil
 }
 
 // promqlOperator maps a SearchRule condition operator to its PromQL syntax.
@@ -212,7 +234,9 @@ func parsePromDuration(s string) (monitoringv1.Duration, error) {
 }
 
 // deletePrometheusRuleIfExists removes the PrometheusRule that mirrors this
-// SearchRule, ignoring NotFound errors.
+// SearchRule, ignoring NotFound errors. Only deletes resources owned by the
+// given SearchRule so a hand-managed PrometheusRule that happens to share the
+// name is never destroyed.
 func (r *SearchRuleReconciler) deletePrometheusRuleIfExists(ctx context.Context, rule *v1alpha1.SearchRule) error {
 	pr := &monitoringv1.PrometheusRule{}
 	key := types.NamespacedName{Namespace: rule.Namespace, Name: rule.Name}
@@ -222,10 +246,27 @@ func (r *SearchRuleReconciler) deletePrometheusRuleIfExists(ctx context.Context,
 		}
 		return fmt.Errorf("failed to fetch existing PrometheusRule for cleanup: %w", err)
 	}
+	if !isOwnedByThisSearchRule(pr, rule) {
+		// Not ours: leave it alone.
+		return nil
+	}
 	if err := r.Delete(ctx, pr); err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("failed to delete PrometheusRule: %w", err)
 	}
 	return nil
+}
+
+// isOwnedByThisSearchRule returns true when the PrometheusRule has a
+// controller OwnerReference pointing at the given SearchRule. This is the
+// strict ownership check used to decide whether the operator may mutate or
+// delete the resource.
+func isOwnedByThisSearchRule(pr *monitoringv1.PrometheusRule, rule *v1alpha1.SearchRule) bool {
+	for _, ref := range pr.OwnerReferences {
+		if ref.Controller != nil && *ref.Controller && ref.UID == rule.UID {
+			return true
+		}
+	}
+	return false
 }
 
 // mergeLabels returns a new map containing all keys from base, with values
