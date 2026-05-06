@@ -19,6 +19,7 @@ package searchrule
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -200,17 +201,28 @@ func buildAlertingRule(rule *v1alpha1.SearchRule, expr string, forDuration monit
 // same name in different namespaces would otherwise share the same time
 // series. The label is `searchrule_namespace` (not `namespace`) to avoid the
 // ServiceMonitor target-label collision described in metrics.go.
+//
+// The threshold is parsed as a float and re-rendered before being inlined.
+// We never embed the user-provided string directly: it would let a SearchRule
+// author smuggle arbitrary PromQL into the alert expression
+// (e.g. "100 or vector(0)"), bypassing the intended scalar comparison.
 func buildPromQLExpr(rule *v1alpha1.SearchRule) (string, error) {
 	op, err := promqlOperator(rule.Spec.Condition.Operator)
 	if err != nil {
 		return "", err
 	}
-	threshold := rule.Spec.Condition.Threshold
-	if threshold == "" {
+	rawThreshold := rule.Spec.Condition.Threshold
+	if rawThreshold == "" {
 		return "", fmt.Errorf("condition.threshold is empty")
 	}
+	threshold, err := strconv.ParseFloat(rawThreshold, 64)
+	if err != nil {
+		return "", fmt.Errorf("condition.threshold %q is not a valid float: %w", rawThreshold, err)
+	}
+	// strconv.FormatFloat with -1 precision keeps the shortest representation
+	// that round-trips, so "100" stays "100" and "0.5" stays "0.5".
 	return fmt.Sprintf(`searchrule_value{searchrule_namespace=%q,rule=%q} %s %s`,
-		rule.Namespace, rule.Name, op, threshold), nil
+		rule.Namespace, rule.Name, op, strconv.FormatFloat(threshold, 'f', -1, 64)), nil
 }
 
 // promqlOperator maps a SearchRule condition operator to its PromQL syntax.

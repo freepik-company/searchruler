@@ -126,6 +126,21 @@ func TestBuildPromQLExpr(t *testing.T) {
 			condition: searchrulerv1alpha1.Condition{Operator: "neverHeardOf", Threshold: "10", For: "1m"},
 			wantErr:   true,
 		},
+		{
+			name:      "non-numeric threshold rejected",
+			condition: searchrulerv1alpha1.Condition{Operator: conditionGreaterThan, Threshold: "not_a_number", For: "1m"},
+			wantErr:   true,
+		},
+		{
+			name:      "promql injection attempt rejected",
+			condition: searchrulerv1alpha1.Condition{Operator: conditionGreaterThan, Threshold: "100 or vector(0)", For: "1m"},
+			wantErr:   true,
+		},
+		{
+			name:      "scientific notation normalized",
+			condition: searchrulerv1alpha1.Condition{Operator: conditionGreaterThan, Threshold: "1e3", For: "1m"},
+			want:      `searchrule_value{searchrule_namespace="default",rule="demo"} > 1000`,
+		},
 	}
 	for _, c := range cases {
 		c := c

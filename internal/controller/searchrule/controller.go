@@ -156,6 +156,12 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	hasPromRule := searchRuleResource.Spec.PrometheusRule != nil &&
 		searchRuleResource.Spec.PrometheusRule.Enabled
 	if searchRuleResource.Spec.ActionRef == nil && !hasPromRule {
+		// Drop any in-flight alert for this rule. Without this, removing
+		// actionRef on a firing SearchRule would leave a stale entry in the
+		// AlertsPool (Sync never runs because of the early return below) and
+		// the RulerAction controller would keep delivering it.
+		r.AlertsPool.Delete(fmt.Sprintf("%s_%s",
+			searchRuleResource.Namespace, searchRuleResource.Name))
 		r.UpdateConditionMissingOutput(searchRuleResource)
 		return ctrl.Result{}, fmt.Errorf("searchrule %s/%s has no actionRef nor enabled prometheusRule",
 			searchRuleResource.Namespace, searchRuleResource.Name)
