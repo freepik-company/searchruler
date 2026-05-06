@@ -369,6 +369,9 @@ func TestReconcilePrometheusRule_DisabledAfterEnabled_DeletesResource(t *testing
 	if err := r.reconcilePrometheusRule(context.Background(), rule); err != nil {
 		t.Fatalf("first reconcile: %v", err)
 	}
+	if !hasCondition(rule.Status.Conditions, "PrometheusRule", "Synced") {
+		t.Fatalf("expected Synced condition after enable, got=%v", rule.Status.Conditions)
+	}
 
 	// User flips enabled to false.
 	rule.Spec.PrometheusRule.Enabled = false
@@ -379,6 +382,14 @@ func TestReconcilePrometheusRule_DisabledAfterEnabled_DeletesResource(t *testing
 	pr := &monitoringv1.PrometheusRule{}
 	if err := c.Get(context.Background(), types.NamespacedName{Namespace: rule.Namespace, Name: rule.Name}, pr); !apierrors.IsNotFound(err) {
 		t.Fatalf("expected PrometheusRule to be deleted, got err=%v", err)
+	}
+
+	// And the previously-set status condition must be gone, otherwise the
+	// SearchRule keeps reporting Synced/MetricsNotExposed forever.
+	for _, c := range rule.Status.Conditions {
+		if c.Type == "PrometheusRule" {
+			t.Fatalf("expected PrometheusRule condition to be removed, still got=%v", c)
+		}
 	}
 }
 

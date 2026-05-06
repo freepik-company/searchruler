@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"freepik.com/searchruler/api/v1alpha1"
+	"freepik.com/searchruler/internal/globals"
 )
 
 const (
@@ -66,8 +67,12 @@ func (r *SearchRuleReconciler) reconcilePrometheusRule(ctx context.Context, rule
 
 	desired := rule.Spec.PrometheusRule
 
-	// Disabled or absent: ensure any previously-created PrometheusRule is gone.
+	// Disabled or absent: ensure any previously-created PrometheusRule is gone
+	// and clear any stale status condition. Otherwise a SearchRule that used
+	// to report PrometheusRule.Synced would keep showing that state long
+	// after the feature was turned off.
 	if desired == nil || !desired.Enabled {
+		globals.RemoveCondition(&rule.Status.Conditions, globals.ConditionTypePrometheusRule)
 		if !r.PrometheusRuleSupported {
 			return nil
 		}

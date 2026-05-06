@@ -144,3 +144,19 @@ func UpdateCondition(conditions *[]metav1.Condition, condition metav1.Condition)
 		currentCondition.LastTransitionTime = metav1.Now()
 	}
 }
+
+// RemoveCondition drops any condition with the given type from the slice.
+// Useful when a feature toggle flips off and we want to keep the status free
+// of stale information.
+func RemoveCondition(conditions *[]metav1.Condition, condType string) {
+	if conditions == nil {
+		return
+	}
+	out := (*conditions)[:0]
+	for _, c := range *conditions {
+		if c.Type != condType {
+			out = append(out, c)
+		}
+	}
+	*conditions = out
+}

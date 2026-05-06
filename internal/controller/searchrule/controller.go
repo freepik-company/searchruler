@@ -137,7 +137,19 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}()
 
-	// 6. Validate that at least one output is defined. A SearchRule whose only
+	// 6. Reconcile the auto-generated PrometheusRule first so a transition
+	// from "enabled" to "disabled" (or to "no outputs at all") deletes the
+	// existing PrometheusRule before any short-circuit return below. If we
+	// returned earlier on MissingOutput, a previously-created PrometheusRule
+	// would survive in the cluster and keep firing alerts even though the
+	// SearchRule no longer defines any active output.
+	if err := r.reconcilePrometheusRule(ctx, searchRuleResource); err != nil {
+		logger.Info(fmt.Sprintf("failed to reconcile PrometheusRule for %s: %s",
+			req.NamespacedName, err.Error()))
+		return result, err
+	}
+
+	// 7. Validate that at least one output is defined. A SearchRule whose only
 	// purpose is to update its own status (without actionRef and without an
 	// enabled prometheusRule) silently produces nothing useful, so flag it.
 	// A non-nil but disabled prometheusRule does not count as an output.
@@ -147,13 +159,6 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		r.UpdateConditionMissingOutput(searchRuleResource)
 		return ctrl.Result{}, fmt.Errorf("searchrule %s/%s has no actionRef nor enabled prometheusRule",
 			searchRuleResource.Namespace, searchRuleResource.Name)
-	}
-
-	// 7. Reconcile the auto-generated PrometheusRule (no-op when not enabled).
-	if err := r.reconcilePrometheusRule(ctx, searchRuleResource); err != nil {
-		logger.Info(fmt.Sprintf("failed to reconcile PrometheusRule for %s: %s",
-			req.NamespacedName, err.Error()))
-		return result, err
 	}
 
 	// 8. Schedule periodical request
