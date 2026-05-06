@@ -361,25 +361,30 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 			rule.State = RuleFiringState
 			r.RulesPool.Set(ruleKey, rule)
 
-			// Add alert to the pool with the value, the object and the rulerAction name which will trigger the alert
-			alertKey := fmt.Sprintf("%s_%s", resource.Namespace, resource.Name)
-			r.AlertsPool.Set(alertKey, &pools.Alert{
-				RulerActionName: resource.Spec.ActionRef.Name,
-				SearchRule:      *resource,
-				Value:           conditionValue.Float(),
-				Aggregations:    aggregationsResource,
-			})
+			// Only enqueue the alert (and emit a Kubernetes Event for the
+			// RulerAction controller) when actionRef is configured. SearchRules
+			// that route exclusively through prometheusRule will skip this
+			// path; their alert lifecycle is owned by Prometheus + Alertmanager.
+			if resource.Spec.ActionRef != nil {
+				alertKey := fmt.Sprintf("%s_%s", resource.Namespace, resource.Name)
+				r.AlertsPool.Set(alertKey, &pools.Alert{
+					RulerActionName: resource.Spec.ActionRef.Name,
+					SearchRule:      *resource,
+					Value:           conditionValue.Float(),
+					Aggregations:    aggregationsResource,
+				})
 
-			// Create an event in Kubernetes of AlertFiring. This event will be readed by the RulerAction controller
-			// and will trigger the action inmediately
-			err = createKubeEvent(
-				ctx,
-				*resource,
-				kubeEventReasonAlertFiring,
-				fmt.Sprintf("Rule is in firing state. Current value is %v", conditionValue),
-			)
-			if err != nil {
-				return fmt.Errorf(controller.KubeEventCreationErrorMessage, err)
+				// Create an event in Kubernetes of AlertFiring. This event will be readed by the RulerAction controller
+				// and will trigger the action inmediately
+				err = createKubeEvent(
+					ctx,
+					*resource,
+					kubeEventReasonAlertFiring,
+					fmt.Sprintf("Rule is in firing state. Current value is %v", conditionValue),
+				)
+				if err != nil {
+					return fmt.Errorf(controller.KubeEventCreationErrorMessage, err)
+				}
 			}
 
 			// Log the alert and change the AlertStatus to Firing of the searchRule

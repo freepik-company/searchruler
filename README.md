@@ -438,6 +438,45 @@ spec:
 
 ```
 
+#### 📡 Auto-generate a PrometheusRule
+
+If your stack already runs the [prometheus-operator](https://github.com/prometheus-operator/prometheus-operator) plus Alertmanager, you don't need a `RulerAction` for the alert to land in Alertmanager — the operator can generate a `PrometheusRule` resource for you that mirrors the SearchRule's condition. The Prometheus Operator picks it up automatically and Prometheus evaluates the alert against the `searchrule_value` metric exposed by this operator.
+
+```yaml
+apiVersion: searchruler.freepik.com/v1alpha1
+kind: SearchRule
+metadata:
+  name: searchrule-prometheusrule-sample
+spec:
+  description: "High 5xx rate"
+  # ... queryConnectorRef, checkInterval, elasticsearch, condition as usual ...
+
+  prometheusRule:
+    enabled: true
+    # Optional. Defaults to the SearchRule's name.
+    alertName: HighErrorRate
+    labels:
+      severity: warning
+      team: platform
+    annotations:
+      summary: "High error rate on the application"
+      runbook_url: "https://runbooks.example.com/high-errors"
+
+  # actionRef is optional when prometheusRule is enabled. At least one of
+  # actionRef or prometheusRule MUST be defined.
+```
+
+Behavior:
+- The generated `PrometheusRule` is named after the SearchRule, lives in the same namespace, and is owned by the SearchRule (deleting the SearchRule garbage-collects the alert).
+- The PromQL expression is derived from `spec.condition`, e.g. `searchrule_value{rule="searchrule-prometheusrule-sample"} > 100`.
+- The `for` window comes from `spec.condition.for`.
+- A `searchrule` label is added automatically to the alert so multiple SearchRules can share the same group in Alertmanager dashboards.
+
+Prerequisites and caveats:
+- The `monitoring.coreos.com/v1` PrometheusRule CRD must exist in the cluster. If it is missing, the SearchRule reports `PrometheusRule.Unsupported` in its `status.conditions` and no resource is created. The operator boot logs a warning at startup.
+- The custom-metrics endpoint must be enabled with `--rules-metrics-bind-address`, otherwise the underlying `searchrule_value` metric is never exported and the alert can never fire. In that case the SearchRule still gets a PrometheusRule, but it is marked with `PrometheusRule.MetricsNotExposed` in `status.conditions` so the misconfiguration is visible.
+- A `ServiceMonitor` (or `PodMonitor`) targeting the operator's metrics service must exist for Prometheus to actually scrape the metric. The chart's `controller.customMetrics.service` enables the Service; you provision the ServiceMonitor according to your Prometheus deployment.
+
 ## Templating engine
 
 ❤️ Special mention to [Notifik](https://github.com/freepik-company/notifik/tree/master)

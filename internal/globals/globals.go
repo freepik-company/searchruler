@@ -81,6 +81,25 @@ const (
 	// No certificates found
 	ConditionReasonNoCertsFoundType    = "NoCertsFound"
 	ConditionReasonNoCertsFoundMessage = "No certificates found in secret"
+
+	// PrometheusRule output condition
+	ConditionTypePrometheusRule = "PrometheusRule"
+
+	ConditionReasonPrometheusRuleSyncedType    = "Synced"
+	ConditionReasonPrometheusRuleSyncedMessage = "PrometheusRule resource is in sync with the SearchRule"
+
+	ConditionReasonPrometheusRuleUnsupportedType    = "Unsupported"
+	ConditionReasonPrometheusRuleUnsupportedMessage = "monitoring.coreos.com/v1 PrometheusRule CRD is not installed in the cluster"
+
+	ConditionReasonPrometheusRuleMetricsNotExposedType    = "MetricsNotExposed"
+	ConditionReasonPrometheusRuleMetricsNotExposedMessage = "PrometheusRule was created but the searchrule_value metric is not exposed (--rules-metrics-bind-address=0); alerts will not fire until the operator exposes its custom metrics"
+
+	ConditionReasonPrometheusRuleErrorType    = "PrometheusRuleError"
+	ConditionReasonPrometheusRuleErrorMessage = "Failed to reconcile the PrometheusRule resource"
+
+	// At least one of actionRef or prometheusRule must be defined
+	ConditionReasonMissingOutputType    = "MissingOutput"
+	ConditionReasonMissingOutputMessage = "SearchRule has neither actionRef nor prometheusRule defined; at least one is required"
 )
 
 var (

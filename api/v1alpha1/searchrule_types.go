@@ -61,14 +61,36 @@ type MetricLabel struct {
 	StaticValue bool   `json:"staticValue,omitempty"`
 }
 
+// PrometheusRuleSpec configures the auto-generated PrometheusRule (CRD from
+// the prometheus-operator project) that mirrors this SearchRule's condition
+// against the searchrule_value metric exposed by the operator. When enabled,
+// a PrometheusRule resource is created in the same namespace as the
+// SearchRule, owned by it (so it is garbage-collected on deletion), and the
+// Prometheus Operator picks it up automatically.
+type PrometheusRuleSpec struct {
+	// Enabled toggles the creation of the PrometheusRule for this SearchRule.
+	Enabled bool `json:"enabled"`
+
+	// AlertName overrides the alert name in the generated PrometheusRule.
+	// Defaults to the SearchRule name.
+	AlertName string `json:"alertName,omitempty"`
+
+	// Labels are merged into the alert labels.
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Annotations are merged into the alert annotations.
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
 // SearchRuleSpec defines the desired state of SearchRule.
 type SearchRuleSpec struct {
-	Description       string            `json:"description,omitempty"`
-	QueryConnectorRef QueryConnectorRef `json:"queryConnectorRef"`
-	CheckInterval     string            `json:"checkInterval"`
-	Elasticsearch     Elasticsearch     `json:"elasticsearch"`
-	Condition         Condition         `json:"condition"`
-	ActionRef         ActionRef         `json:"actionRef"`
+	Description       string              `json:"description,omitempty"`
+	QueryConnectorRef QueryConnectorRef   `json:"queryConnectorRef"`
+	CheckInterval     string              `json:"checkInterval"`
+	Elasticsearch     Elasticsearch       `json:"elasticsearch"`
+	Condition         Condition           `json:"condition"`
+	ActionRef         *ActionRef          `json:"actionRef,omitempty"`
+	PrometheusRule    *PrometheusRuleSpec `json:"prometheusRule,omitempty"`
 }
 
 // SearchRuleStatus defines the observed state of SearchRule.

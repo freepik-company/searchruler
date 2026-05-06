@@ -143,3 +143,45 @@ func (r *SearchRuleReconciler) UpdateConditionQueryError(SearchRule *v1alpha1.Se
 	// Update the status of the SearchRule resource
 	globals.UpdateCondition(&SearchRule.Status.Conditions, condition)
 }
+
+// UpdateConditionPrometheusRuleSynced reports a successful reconcile of the
+// auto-generated PrometheusRule resource.
+func (r *SearchRuleReconciler) UpdateConditionPrometheusRuleSynced(searchRule *v1alpha1.SearchRule) {
+	condition := globals.NewCondition(globals.ConditionTypePrometheusRule, metav1.ConditionTrue,
+		globals.ConditionReasonPrometheusRuleSyncedType, globals.ConditionReasonPrometheusRuleSyncedMessage)
+	globals.UpdateCondition(&searchRule.Status.Conditions, condition)
+}
+
+// UpdateConditionPrometheusRuleUnsupported reports that the cluster does not
+// have the monitoring.coreos.com/v1 PrometheusRule CRD installed.
+func (r *SearchRuleReconciler) UpdateConditionPrometheusRuleUnsupported(searchRule *v1alpha1.SearchRule) {
+	condition := globals.NewCondition(globals.ConditionTypePrometheusRule, metav1.ConditionFalse,
+		globals.ConditionReasonPrometheusRuleUnsupportedType, globals.ConditionReasonPrometheusRuleUnsupportedMessage)
+	globals.UpdateCondition(&searchRule.Status.Conditions, condition)
+}
+
+// UpdateConditionPrometheusRuleMetricsNotExposed warns the user that the
+// PrometheusRule was created but the underlying metric is not being served by
+// the operator (--rules-metrics-bind-address=0).
+func (r *SearchRuleReconciler) UpdateConditionPrometheusRuleMetricsNotExposed(searchRule *v1alpha1.SearchRule) {
+	condition := globals.NewCondition(globals.ConditionTypePrometheusRule, metav1.ConditionTrue,
+		globals.ConditionReasonPrometheusRuleMetricsNotExposedType, globals.ConditionReasonPrometheusRuleMetricsNotExposedMessage)
+	globals.UpdateCondition(&searchRule.Status.Conditions, condition)
+}
+
+// UpdateConditionPrometheusRuleError reports a failure reconciling the
+// PrometheusRule. The detailed message comes from the underlying error so the
+// user can see why the API call or rendering failed.
+func (r *SearchRuleReconciler) UpdateConditionPrometheusRuleError(searchRule *v1alpha1.SearchRule, message string) {
+	condition := globals.NewCondition(globals.ConditionTypePrometheusRule, metav1.ConditionFalse,
+		globals.ConditionReasonPrometheusRuleErrorType, message)
+	globals.UpdateCondition(&searchRule.Status.Conditions, condition)
+}
+
+// UpdateConditionMissingOutput reports that the SearchRule defines neither
+// actionRef nor prometheusRule and thus cannot produce any output.
+func (r *SearchRuleReconciler) UpdateConditionMissingOutput(searchRule *v1alpha1.SearchRule) {
+	condition := globals.NewCondition(globals.ConditionTypeResourceSynced, metav1.ConditionFalse,
+		globals.ConditionReasonMissingOutputType, globals.ConditionReasonMissingOutputMessage)
+	globals.UpdateCondition(&searchRule.Status.Conditions, condition)
+}
