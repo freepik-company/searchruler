@@ -98,6 +98,91 @@ func TestPromqlOperator(t *testing.T) {
 	}
 }
 
+func TestChooseAlertMetric(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		rule *searchrulerv1alpha1.SearchRule
+		want string
+	}{
+		{
+			name: "no customMetrics falls back to legacy",
+			rule: newSearchRule(nil),
+			want: "searchrule_value",
+		},
+		{
+			name: "single custom metric is selected",
+			rule: newSearchRule(func(r *searchrulerv1alpha1.SearchRule) {
+				r.Spec.CustomMetrics = []searchrulerv1alpha1.CustomMetric{{Name: "akamai_5xx_by_host"}}
+			}),
+			want: "searchrule_akamai_5xx_by_host",
+		},
+		{
+			name: "first custom metric wins when no MetricName selector",
+			rule: newSearchRule(func(r *searchrulerv1alpha1.SearchRule) {
+				r.Spec.CustomMetrics = []searchrulerv1alpha1.CustomMetric{
+					{Name: "primary"},
+					{Name: "secondary"},
+				}
+				r.Spec.PrometheusRule = &searchrulerv1alpha1.PrometheusRuleSpec{Enabled: true}
+			}),
+			want: "searchrule_primary",
+		},
+		{
+			name: "MetricName selector picks the matching metric",
+			rule: newSearchRule(func(r *searchrulerv1alpha1.SearchRule) {
+				r.Spec.CustomMetrics = []searchrulerv1alpha1.CustomMetric{
+					{Name: "primary"},
+					{Name: "secondary"},
+				}
+				r.Spec.PrometheusRule = &searchrulerv1alpha1.PrometheusRuleSpec{
+					Enabled:    true,
+					MetricName: "secondary",
+				}
+			}),
+			want: "searchrule_secondary",
+		},
+		{
+			name: "unknown MetricName falls back to first entry",
+			rule: newSearchRule(func(r *searchrulerv1alpha1.SearchRule) {
+				r.Spec.CustomMetrics = []searchrulerv1alpha1.CustomMetric{
+					{Name: "primary"},
+					{Name: "secondary"},
+				}
+				r.Spec.PrometheusRule = &searchrulerv1alpha1.PrometheusRuleSpec{
+					Enabled:    true,
+					MetricName: "ghost",
+				}
+			}),
+			want: "searchrule_primary",
+		},
+	}
+	for _, c := range cases {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			if got := chooseAlertMetric(c.rule); got != c.want {
+				t.Fatalf("got=%q want=%q", got, c.want)
+			}
+		})
+	}
+}
+
+func TestBuildPromQLExpr_UsesCustomMetric(t *testing.T) {
+	t.Parallel()
+	rule := newSearchRule(func(r *searchrulerv1alpha1.SearchRule) {
+		r.Spec.CustomMetrics = []searchrulerv1alpha1.CustomMetric{{Name: "akamai_5xx_by_host"}}
+	})
+	got, err := buildPromQLExpr(rule)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	want := `searchrule_akamai_5xx_by_host{searchrule_namespace="default",rule="demo"} > 100`
+	if got != want {
+		t.Fatalf("got=%q\nwant=%q", got, want)
+	}
+}
+
 func TestBuildPromQLExpr(t *testing.T) {
 	t.Parallel()
 	cases := []struct {

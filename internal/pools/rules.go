@@ -30,6 +30,12 @@ type Rule struct {
 	ResolvingTime time.Time
 	State         string
 	Value         float64
+
+	// Aggregations holds the last `aggregations` block parsed from the
+	// Elasticsearch response. The metrics goroutine reads it to fan out
+	// spec.customMetrics into per-bucket Prometheus samples; nil when the
+	// query did not return any aggregations.
+	Aggregations interface{}
 }
 
 // RulesStore

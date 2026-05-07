@@ -100,6 +100,23 @@ const (
 	// At least one of actionRef or prometheusRule must be defined
 	ConditionReasonMissingOutputType    = "MissingOutput"
 	ConditionReasonMissingOutputMessage = "SearchRule has neither actionRef nor prometheusRule defined; at least one is required"
+
+	// CustomMetrics — bucket-aware Prometheus gauges
+	ConditionTypeCustomMetrics = "CustomMetrics"
+
+	ConditionReasonCustomMetricsSyncedType    = "Synced"
+	ConditionReasonCustomMetricsSyncedMessage = "Custom metrics derived from the Elasticsearch aggregations are being exposed"
+
+	ConditionReasonCustomMetricsNoAggregationsType    = "NoAggregations"
+	ConditionReasonCustomMetricsNoAggregationsMessage = "spec.customMetrics is set but the last Elasticsearch response did not include any aggregations; nothing to expose"
+
+	ConditionReasonCustomMetricsPathNotFoundType = "PathNotFound"
+
+	ConditionReasonCustomMetricsNameReservedType = "NameReserved"
+
+	ConditionReasonCustomMetricsTruncatedType = "Truncated"
+
+	ConditionReasonCustomMetricsLabelMismatchType = "LabelMismatch"
 )
 
 var (

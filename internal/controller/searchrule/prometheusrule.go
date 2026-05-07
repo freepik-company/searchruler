@@ -201,12 +201,16 @@ func buildAlertingRule(rule *v1alpha1.SearchRule, expr string, forDuration monit
 }
 
 // buildPromQLExpr translates a SearchRule's condition into a PromQL
-// expression on the searchrule_value metric exposed by the operator.
-// The selector includes both searchrule_namespace and rule labels because
-// SearchRule names are unique only within a namespace, so two rules with the
-// same name in different namespaces would otherwise share the same time
-// series. The label is `searchrule_namespace` (not `namespace`) to avoid the
-// ServiceMonitor target-label collision described in metrics.go.
+// expression. By default it filters the global `searchrule_value` gauge by
+// namespace+rule. When the SearchRule declares spec.customMetrics the
+// operator picks the relevant custom gauge (which carries the per-bucket
+// dimensions) so the resulting alert in Alertmanager fires once per bucket
+// over the threshold and inherits the bucket labels (e.g. `host="cp.freepik.com"`).
+//
+// Selector includes both searchrule_namespace and rule labels because
+// SearchRule names are unique only within a namespace. The label is
+// `searchrule_namespace` (not `namespace`) to avoid the ServiceMonitor
+// target-label collision described in metrics.go.
 //
 // The threshold is parsed as a float and re-rendered before being inlined.
 // We never embed the user-provided string directly: it would let a SearchRule
@@ -225,10 +229,36 @@ func buildPromQLExpr(rule *v1alpha1.SearchRule) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("condition.threshold %q is not a valid float: %w", rawThreshold, err)
 	}
+	thresholdStr := strconv.FormatFloat(threshold, 'f', -1, 64)
+	metric := chooseAlertMetric(rule)
 	// strconv.FormatFloat with -1 precision keeps the shortest representation
 	// that round-trips, so "100" stays "100" and "0.5" stays "0.5".
-	return fmt.Sprintf(`searchrule_value{searchrule_namespace=%q,rule=%q} %s %s`,
-		rule.Namespace, rule.Name, op, strconv.FormatFloat(threshold, 'f', -1, 64)), nil
+	return fmt.Sprintf(`%s{searchrule_namespace=%q,rule=%q} %s %s`,
+		metric, rule.Namespace, rule.Name, op, thresholdStr), nil
+}
+
+// chooseAlertMetric returns the Prometheus metric name the generated alert
+// should target. When customMetrics is empty we fall back to the legacy
+// `searchrule_value`. With one entry, we use it. With several, we honour
+// `spec.prometheusRule.metricName` if it matches a declared name; otherwise
+// we default to the first one.
+func chooseAlertMetric(rule *v1alpha1.SearchRule) string {
+	const legacy = "searchrule_value"
+	if len(rule.Spec.CustomMetrics) == 0 {
+		return legacy
+	}
+	preferred := ""
+	if rule.Spec.PrometheusRule != nil {
+		preferred = rule.Spec.PrometheusRule.MetricName
+	}
+	if preferred != "" {
+		for _, cm := range rule.Spec.CustomMetrics {
+			if cm.Name == preferred {
+				return "searchrule_" + cm.Name
+			}
+		}
+	}
+	return "searchrule_" + rule.Spec.CustomMetrics[0].Name
 }
 
 // promqlOperator maps a SearchRule condition operator to its PromQL syntax.
