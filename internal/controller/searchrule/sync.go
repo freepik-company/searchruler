@@ -333,11 +333,14 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 		r.AlertsPool.Delete(alertKey)
 	}
 
-	// Get returns a value-copy: every mutation below is local and only
-	// becomes visible to readers (the metrics goroutine, the webserver)
-	// after the explicit Set, which deep-copies into the pool. This is
-	// what prevents a torn read on `rule.Aggregations` (interface{} is
-	// two machine words wide).
+	// Get returns a struct-level copy of the pool entry: every mutation
+	// below is local and only becomes visible to readers (the metrics
+	// goroutine, the webserver) after the explicit Set, which performs
+	// the same struct-level copy under the pool's write lock. This
+	// prevents the torn-read race on `rule.Aggregations` (interface{}
+	// is two machine words). The copy is shallow, so we are careful to
+	// reassign slice/map/interface fields with new values rather than
+	// mutating their backing storage in place.
 	rule, ruleInPool := r.RulesPool.Get(ruleKey)
 	if !ruleInPool {
 		// Initialize rule with default values

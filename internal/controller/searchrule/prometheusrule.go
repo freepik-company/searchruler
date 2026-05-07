@@ -64,7 +64,7 @@ const (
 //     normal sync loop continues.
 //   - Otherwise, a PrometheusRule named after the SearchRule is created or
 //     updated, owned by the SearchRule for automatic GC.
-func (r *SearchRuleReconciler) reconcilePrometheusRule(ctx context.Context, rule *v1alpha1.SearchRule) error {
+func (r *SearchRuleReconciler) reconcilePrometheusRule(ctx context.Context, rule *v1alpha1.SearchRule, cleanupOnly bool) error {
 	logger := log.FromContext(ctx)
 
 	desired := rule.Spec.PrometheusRule
@@ -73,8 +73,16 @@ func (r *SearchRuleReconciler) reconcilePrometheusRule(ctx context.Context, rule
 	// and clear any stale status condition. Otherwise a SearchRule that used
 	// to report PrometheusRule.Synced would keep showing that state long
 	// after the feature was turned off.
-	if desired == nil || !desired.Enabled {
-		globals.RemoveCondition(&rule.Status.Conditions, globals.ConditionTypePrometheusRule)
+	//
+	// cleanupOnly is set by the main Reconcile loop when spec.customMetrics
+	// is structurally invalid: even if prometheusRule.enabled is true we
+	// must not try to render a rule against the broken gauge, but we still
+	// want to delete any PrometheusRule we created in a previous good run
+	// so we do not leak a stale alert in Alertmanager.
+	if desired == nil || !desired.Enabled || cleanupOnly {
+		if !cleanupOnly {
+			globals.RemoveCondition(&rule.Status.Conditions, globals.ConditionTypePrometheusRule)
+		}
 		if !r.PrometheusRuleSupported {
 			return nil
 		}
@@ -258,6 +266,20 @@ func buildPromQLExpr(rule *v1alpha1.SearchRule) (string, error) {
 	// that round-trips, so "100" stays "100" and "0.5" stays "0.5".
 	return fmt.Sprintf(`%s{searchrule_namespace=%q,rule=%q} %s %s`,
 		metric, rule.Namespace, rule.Name, op, thresholdStr), nil
+}
+
+// firstCustomMetricValidationError walks spec.customMetrics in order and
+// returns the first Validate() failure, if any. Used by the main Reconcile
+// loop to surface the misconfiguration as a status condition without
+// blocking the rest of the reconcile (PrometheusRule cleanup, actionRef
+// pipeline) — see the cleanupOnly flag on reconcilePrometheusRule.
+func firstCustomMetricValidationError(metrics []v1alpha1.CustomMetric) error {
+	for _, cm := range metrics {
+		if err := cm.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // chooseAlertMetric returns the Prometheus metric name the generated alert
