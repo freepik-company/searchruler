@@ -276,6 +276,17 @@ func TestValidateCustomMetric_Labels(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "duplicate label names rejected",
+			cm: v1alpha1.CustomMetric{
+				Name: "ok",
+				Labels: []v1alpha1.MetricLabel{
+					{Name: "host", Value: "key"},
+					{Name: "host", Value: "domain"},
+				},
+			},
+			wantErr: true,
+		},
 	}
 	for _, c := range cases {
 		c := c

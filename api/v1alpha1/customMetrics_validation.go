@@ -59,12 +59,14 @@ func ValidateCustomMetricName(name string) error {
 
 // Validate checks the entire CustomMetric for the static issues we can
 // detect before talking to Elasticsearch (name shape, reserved name, label
-// shape, reserved labels). Runtime issues such as missing aggregation
-// paths or non-numeric values surface separately during reconciliation.
+// shape, reserved labels, duplicate label names). Runtime issues such as
+// missing aggregation paths or non-numeric values surface separately
+// during reconciliation.
 func (cm CustomMetric) Validate() error {
 	if err := ValidateCustomMetricName(cm.Name); err != nil {
 		return err
 	}
+	seen := make(map[string]struct{}, len(cm.Labels))
 	for _, lbl := range cm.Labels {
 		if !promIdentifierRe.MatchString(lbl.Name) {
 			return fmt.Errorf("customMetric %q label name %q must match %s",
@@ -74,6 +76,15 @@ func (cm CustomMetric) Validate() error {
 			return fmt.Errorf("customMetric %q label name %q is reserved (the operator emits it implicitly)",
 				cm.Name, lbl.Name)
 		}
+		// Prometheus' GaugeVec rejects duplicate label names at
+		// registration time with a generic error; catch it here so the
+		// failure shows up in `kubectl get searchrule` instead of only
+		// in the operator's logs.
+		if _, dup := seen[lbl.Name]; dup {
+			return fmt.Errorf("customMetric %q has duplicate label name %q",
+				cm.Name, lbl.Name)
+		}
+		seen[lbl.Name] = struct{}{}
 	}
 	return nil
 }

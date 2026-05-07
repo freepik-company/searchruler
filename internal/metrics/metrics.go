@@ -412,9 +412,12 @@ func (m *customMetricManager) gaugeFor(fullName, help string, labelNames []strin
 			return nil, fmt.Errorf("metric %q already registered with labels %v; cannot re-register with %v",
 				fullName, m.labels[fullName], labelNames)
 		}
-		// Reset the idle counter so a metric that bounces between empty
-		// ticks and active ones never falls into the stale-gauge GC.
-		m.idleTicks[fullName] = 0
+		// Note: do NOT reset idleTicks here. pruneCustom is the single
+		// authority on idleness — it resets the counter only when the
+		// gauge actually emitted samples this tick. Resetting here would
+		// keep a gauge alive forever even if every bucket fails the
+		// label/value extraction (e.g. a path that never exists), since
+		// updateMetrics calls gaugeFor BEFORE iterating samples.
 		return existing, nil
 	}
 	if help == "" {
