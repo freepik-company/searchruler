@@ -44,19 +44,40 @@ type RulesStore struct {
 	Store map[string]*Rule
 }
 
+// Set stores a value-copy of rule under key. The caller's pointer is
+// never aliased by the pool, so subsequent in-place mutations on it have
+// no effect until another Set runs. This is the only safe way to keep
+// callers from racing with goroutines that read via Get/Snapshot.
 func (c *RulesStore) Set(key string, rule *Rule) {
+	if rule == nil {
+		return
+	}
+	cp := *rule
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.Store[key] = rule
+	c.Store[key] = &cp
 }
 
-func (c *RulesStore) Get(key string) (*Rule, bool) {
+// Get returns a value-copy of the Rule stored under key. Callers mutate
+// their own local copy and must call Set to publish changes back. Returning
+// a copy (not the pointer) means no caller can mutate pool-internal state
+// without the pool's mutex — which closes the torn-read race on the
+// `Aggregations interface{}` field.
+func (c *RulesStore) Get(key string) (Rule, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	rule, exists := c.Store[key]
-	return rule, exists
+	v, ok := c.Store[key]
+	if !ok || v == nil {
+		return Rule{}, false
+	}
+	return *v, true
 }
 
+// GetAll returns the live pointer map. Kept for backwards compatibility
+// with callers that only read; new readers should use Snapshot which
+// returns a value-copied view safe to iterate concurrently with writers.
+//
+// Deprecated: prefer Snapshot for any reader that races with writers.
 func (c *RulesStore) GetAll() map[string]*Rule {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

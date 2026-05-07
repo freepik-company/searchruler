@@ -333,10 +333,15 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 		r.AlertsPool.Delete(alertKey)
 	}
 
+	// Get returns a value-copy: every mutation below is local and only
+	// becomes visible to readers (the metrics goroutine, the webserver)
+	// after the explicit Set, which deep-copies into the pool. This is
+	// what prevents a torn read on `rule.Aggregations` (interface{} is
+	// two machine words wide).
 	rule, ruleInPool := r.RulesPool.Get(ruleKey)
 	if !ruleInPool {
 		// Initialize rule with default values
-		rule = &pools.Rule{
+		rule = pools.Rule{
 			SearchRule:    *resource,
 			FiringTime:    time.Time{},
 			State:         RuleNormalState,
@@ -344,13 +349,13 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 			Value:         conditionValue.Float(),
 			Aggregations:  aggregationsResource,
 		}
-		r.RulesPool.Set(ruleKey, rule)
+		r.RulesPool.Set(ruleKey, &rule)
 	}
 
 	// Check if resource is sync with the pool
 	if !reflect.DeepEqual(rule.SearchRule, *resource) {
 		rule.SearchRule = *resource
-		r.RulesPool.Set(ruleKey, rule)
+		r.RulesPool.Set(ruleKey, &rule)
 	}
 
 	// Set the current value of the condition and the aggregations payload
@@ -358,7 +363,7 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 	// spec.customMetrics into per-bucket samples on its next tick.
 	rule.Value = conditionValue.Float()
 	rule.Aggregations = aggregationsResource
-	r.RulesPool.Set(ruleKey, rule)
+	r.RulesPool.Set(ruleKey, &rule)
 
 	// If rule is firing right now
 	if firing {
@@ -367,13 +372,13 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 		if rule.State == RuleNormalState || rule.State == RulePendingResolvedState {
 			rule.FiringTime = time.Now()
 			rule.State = RulePendingFiringState
-			r.RulesPool.Set(ruleKey, rule)
+			r.RulesPool.Set(ruleKey, &rule)
 		}
 
 		// If rule is firing the For time and it is not notified yet, do it and change state to Firing
 		if time.Since(rule.FiringTime) > forDuration {
 			rule.State = RuleFiringState
-			r.RulesPool.Set(ruleKey, rule)
+			r.RulesPool.Set(ruleKey, &rule)
 
 			// Only enqueue the alert (and emit a Kubernetes Event for the
 			// RulerAction controller) when actionRef is configured. SearchRules
@@ -423,7 +428,7 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 		if rule.State != RulePendingResolvedState {
 			rule.State = RulePendingResolvedState
 			rule.ResolvingTime = time.Now()
-			r.RulesPool.Set(ruleKey, rule)
+			r.RulesPool.Set(ruleKey, &rule)
 		}
 
 		// If rule stay in PendingResolved state during the `for` time, mark as resolved
@@ -433,7 +438,7 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 			r.AlertsPool.Delete(alertKey)
 
 			// Restore rule to default values
-			rule = &pools.Rule{
+			rule = pools.Rule{
 				FiringTime:    time.Time{},
 				State:         RuleNormalState,
 				ResolvingTime: time.Time{},
@@ -441,7 +446,7 @@ func (r *SearchRuleReconciler) Sync(ctx context.Context, eventType watch.EventTy
 				Value:         conditionValue.Float(),
 				Aggregations:  aggregationsResource,
 			}
-			r.RulesPool.Set(ruleKey, rule)
+			r.RulesPool.Set(ruleKey, &rule)
 
 			// Log and update the AlertStatus to Resolved
 			r.UpdateStateNormal(resource)

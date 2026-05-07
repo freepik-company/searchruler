@@ -138,7 +138,21 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}()
 
-	// 6. Reconcile the auto-generated PrometheusRule first so a transition
+	// 6. Validate spec.customMetrics regardless of whether prometheusRule is
+	// enabled. The metrics goroutine will try to register a GaugeVec for
+	// every entry on each refresh tick; a malformed name or label there
+	// would only land in logs. Surfacing the issue as a status condition
+	// here gives `kubectl get searchrule` a single, authoritative place to
+	// read the misconfiguration regardless of the SearchRule's output mix.
+	for _, cm := range searchRuleResource.Spec.CustomMetrics {
+		if validationErr := cm.Validate(); validationErr != nil {
+			r.UpdateConditionPrometheusRuleCustomMetricsInvalid(searchRuleResource, validationErr.Error())
+			return ctrl.Result{}, fmt.Errorf("invalid customMetric on %s/%s: %w",
+				searchRuleResource.Namespace, searchRuleResource.Name, validationErr)
+		}
+	}
+
+	// 7. Reconcile the auto-generated PrometheusRule first so a transition
 	// from "enabled" to "disabled" (or to "no outputs at all") deletes the
 	// existing PrometheusRule before any short-circuit return below. If we
 	// returned earlier on MissingOutput, a previously-created PrometheusRule

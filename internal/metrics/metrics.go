@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -57,19 +56,6 @@ const (
 )
 
 var (
-	// reservedCustomMetricNames blocks user-supplied custom metrics from
-	// shadowing the operator's own gauges.
-	reservedCustomMetricNames = map[string]struct{}{
-		"searchrule_value": {},
-		"searchrule_state": {},
-	}
-
-	// promMetricNameRe enforces Prometheus' metric name grammar after the
-	// `searchrule_` prefix is applied. `[a-zA-Z_:][a-zA-Z0-9_:]*` is the
-	// canonical pattern but `:` is reserved for recording rules so we
-	// disallow it on the user-supplied suffix.
-	promMetricNameRe = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
-
 	// Basic metrics definition (global). The namespace label is exported as
 	// `searchrule_namespace` rather than the more obvious `namespace` to
 	// avoid colliding with the target labels Prometheus injects when
