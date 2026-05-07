@@ -235,6 +235,60 @@ func TestExtractCustomSamples(t *testing.T) {
 	})
 }
 
+func TestValidateCustomMetric_Labels(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name    string
+		cm      v1alpha1.CustomMetric
+		wantErr bool
+	}{
+		{
+			name: "valid name + labels",
+			cm: v1alpha1.CustomMetric{
+				Name: "ok",
+				Labels: []v1alpha1.MetricLabel{
+					{Name: "host", Value: "key"},
+					{Name: "tier_warning", Value: "warn"},
+				},
+			},
+		},
+		{
+			name: "label name with hyphen rejected",
+			cm: v1alpha1.CustomMetric{
+				Name:   "ok",
+				Labels: []v1alpha1.MetricLabel{{Name: "with-hyphen", Value: "key"}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "label name colliding with reserved is rejected",
+			cm: v1alpha1.CustomMetric{
+				Name:   "ok",
+				Labels: []v1alpha1.MetricLabel{{Name: "rule", Value: "key"}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "label name colliding with searchrule_namespace is rejected",
+			cm: v1alpha1.CustomMetric{
+				Name:   "ok",
+				Labels: []v1alpha1.MetricLabel{{Name: "searchrule_namespace", Value: "x"}},
+			},
+			wantErr: true,
+		},
+	}
+	for _, c := range cases {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			err := c.cm.Validate()
+			if (err != nil) != c.wantErr {
+				t.Fatalf("err=%v wantErr=%v", err, c.wantErr)
+			}
+		})
+	}
+}
+
 func TestCustomMetricManager_GaugeFor_RejectsConflictingLabels(t *testing.T) {
 	t.Parallel()
 	// Use a fresh manager + private registry so we don't touch the global one.
@@ -253,5 +307,67 @@ func TestCustomMetricManager_GaugeFor_RejectsConflictingLabels(t *testing.T) {
 	}
 	if _, err := m.gaugeFor("searchrule_test_a", "", []string{"searchrule_namespace", "rule", "pod"}); err == nil {
 		t.Fatalf("different labels should be rejected")
+	}
+}
+
+func TestCustomMetricManager_PruneCustom_GarbageCollectsStale(t *testing.T) {
+	t.Parallel()
+	m := newCustomMetricManager()
+	g := prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "searchrule_test_gc"}, []string{"searchrule_namespace", "rule", "host"})
+	// Note: we register on the package-level prometheusRegistry because the
+	// manager calls prometheusRegistry.Unregister directly.
+	if err := prometheusRegistry.Register(g); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	defer prometheusRegistry.Unregister(g)
+	m.gauges["searchrule_test_gc"] = g
+	m.labels["searchrule_test_gc"] = []string{"searchrule_namespace", "rule", "host"}
+
+	// First tick: emit one series so the manager records previousCustom for it.
+	g.WithLabelValues("ns", "rule", "host1").Set(1)
+	seenFirst := map[customSeriesKey]struct{}{
+		{metric: "searchrule_test_gc", joined: "ns\x1frule\x1fhost1"}: {},
+	}
+	m.pruneCustom(seenFirst)
+	if _, ok := m.gauges["searchrule_test_gc"]; !ok {
+		t.Fatalf("gauge should still be registered after first emission")
+	}
+
+	// Subsequent empty ticks: simulate staleGaugeTickThreshold ticks with
+	// no samples. After the threshold the gauge must be unregistered.
+	for i := 0; i < staleGaugeTickThreshold; i++ {
+		m.pruneCustom(map[customSeriesKey]struct{}{})
+	}
+	if _, ok := m.gauges["searchrule_test_gc"]; ok {
+		t.Fatalf("gauge should have been GC'd after %d empty ticks", staleGaugeTickThreshold)
+	}
+}
+
+func TestCustomMetricManager_PruneCustom_ResetsIdleOnReuse(t *testing.T) {
+	t.Parallel()
+	m := newCustomMetricManager()
+	g := prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "searchrule_test_reuse"}, []string{"searchrule_namespace", "rule", "host"})
+	if err := prometheusRegistry.Register(g); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	defer prometheusRegistry.Unregister(g)
+	m.gauges["searchrule_test_reuse"] = g
+	m.labels["searchrule_test_reuse"] = []string{"searchrule_namespace", "rule", "host"}
+
+	// Several empty ticks short of the GC threshold.
+	for i := 0; i < staleGaugeTickThreshold-1; i++ {
+		m.pruneCustom(map[customSeriesKey]struct{}{})
+	}
+	// One tick with samples must reset the counter.
+	m.pruneCustom(map[customSeriesKey]struct{}{
+		{metric: "searchrule_test_reuse", joined: "ns\x1frule\x1fh"}: {},
+	})
+	// Another full streak of empty ticks; the gauge must survive because the
+	// reset happened mid-streak.
+	for i := 0; i < staleGaugeTickThreshold-1; i++ {
+		m.pruneCustom(map[customSeriesKey]struct{}{})
+	}
+	if _, ok := m.gauges["searchrule_test_reuse"]; !ok {
+		t.Fatalf("gauge should still be registered; idle counter reset failed")
 	}
 }

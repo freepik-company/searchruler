@@ -99,6 +99,8 @@ const (
 
 	ConditionReasonPrometheusRuleMetricNameMismatchType = "MetricNameMismatch"
 
+	ConditionReasonPrometheusRuleCustomMetricsInvalidType = "CustomMetricsInvalid"
+
 	// At least one of actionRef or prometheusRule must be defined
 	ConditionReasonMissingOutputType    = "MissingOutput"
 	ConditionReasonMissingOutputMessage = "SearchRule has neither actionRef nor prometheusRule defined; at least one is required"

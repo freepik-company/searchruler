@@ -189,6 +189,18 @@ func (r *SearchRuleReconciler) UpdateConditionPrometheusRuleMetricNameMismatch(s
 	globals.UpdateCondition(&searchRule.Status.Conditions, condition)
 }
 
+// UpdateConditionPrometheusRuleCustomMetricsInvalid reports that one of the
+// declared `spec.customMetrics[*]` entries is structurally invalid (bad
+// metric name, bad label name, label name colliding with the operator's
+// reserved labels, …). The PrometheusRule is not generated until the
+// SearchRule is fixed because an invalid label name would crash the
+// Prometheus client at registration time.
+func (r *SearchRuleReconciler) UpdateConditionPrometheusRuleCustomMetricsInvalid(searchRule *v1alpha1.SearchRule, message string) {
+	condition := globals.NewCondition(globals.ConditionTypePrometheusRule, metav1.ConditionFalse,
+		globals.ConditionReasonPrometheusRuleCustomMetricsInvalidType, message)
+	globals.UpdateCondition(&searchRule.Status.Conditions, condition)
+}
+
 // UpdateConditionMissingOutput reports that the SearchRule defines neither
 // actionRef nor prometheusRule and thus cannot produce any output.
 func (r *SearchRuleReconciler) UpdateConditionMissingOutput(searchRule *v1alpha1.SearchRule) {

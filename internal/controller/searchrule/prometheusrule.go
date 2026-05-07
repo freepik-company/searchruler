@@ -90,6 +90,17 @@ func (r *SearchRuleReconciler) reconcilePrometheusRule(ctx context.Context, rule
 		return nil
 	}
 
+	// Validate every spec.customMetrics entry up-front so misconfigurations
+	// surface as PrometheusRule.CustomMetricsInvalid before we try to render
+	// the alert. This stops the metrics goroutine from panicking on an
+	// invalid label name and gives the user a clear status condition.
+	for _, cm := range rule.Spec.CustomMetrics {
+		if err := cm.Validate(); err != nil {
+			r.UpdateConditionPrometheusRuleCustomMetricsInvalid(rule, err.Error())
+			return fmt.Errorf("invalid customMetric: %w", err)
+		}
+	}
+
 	expr, err := buildPromQLExpr(rule)
 	if err != nil {
 		r.UpdateConditionPrometheusRuleError(rule, err.Error())

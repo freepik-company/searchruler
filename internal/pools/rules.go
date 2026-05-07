@@ -63,6 +63,26 @@ func (c *RulesStore) GetAll() map[string]*Rule {
 	return c.Store
 }
 
+// Snapshot returns a value-copied view of every Rule in the pool, captured
+// under the read lock. Mutations on the returned entries do not affect the
+// pool. Use this from goroutines that race with the reconciler — notably
+// the metrics ticker, which would otherwise read `rule.Aggregations` (an
+// interface{} so two machine words wide) while the reconciler reassigns it
+// in-place between Get and Set, producing a torn read undetectable by go's
+// race detector unless both goroutines exercise the same key concurrently.
+func (c *RulesStore) Snapshot() map[string]Rule {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	out := make(map[string]Rule, len(c.Store))
+	for k, v := range c.Store {
+		if v == nil {
+			continue
+		}
+		out[k] = *v
+	}
+	return out
+}
+
 func (c *RulesStore) Delete(key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

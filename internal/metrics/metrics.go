@@ -187,9 +187,13 @@ func initializeBasicMetrics() error {
 // updateMetrics refreshes both the legacy gauges and every dynamically
 // declared custom metric, and prunes label tuples that no longer match any
 // SearchRule in the pool so /metrics never advertises stale series.
+//
+// Reads via Snapshot so the reconciler can safely overwrite `rule.Aggregations`
+// in-place between its own Get/Set without producing torn interface{} reads
+// here.
 func updateMetrics(ctx context.Context, rulesPool *pools.RulesStore) error {
 	logger := log.FromContext(ctx)
-	rules := rulesPool.GetAll()
+	rules := rulesPool.Snapshot()
 
 	// Track which (rule, metric, labelTuple) combinations we publish in
 	// this tick so we can diff against the previous tick and delete
@@ -256,21 +260,14 @@ func updateMetrics(ctx context.Context, rulesPool *pools.RulesStore) error {
 	return nil
 }
 
-// validateMetricName returns the full Prometheus name (with prefix) and
-// guards against names that would collide with the operator's own gauges or
-// would not be valid Prometheus identifiers.
+// validateMetricName is a thin wrapper around v1alpha1.ValidateCustomMetricName
+// that prepends the operator's `searchrule_` prefix. Kept in this package so
+// the runtime tracker only knows about the resolved (full) Prometheus name.
 func validateMetricName(name string) (string, error) {
-	if name == "" {
-		return "", fmt.Errorf("customMetric.name is required")
+	if err := v1alpha1.ValidateCustomMetricName(name); err != nil {
+		return "", err
 	}
-	if !promMetricNameRe.MatchString(name) {
-		return "", fmt.Errorf("customMetric.name %q must match %s", name, promMetricNameRe.String())
-	}
-	full := metricNamePrefix + name
-	if _, reserved := reservedCustomMetricNames[full]; reserved {
-		return "", fmt.Errorf("customMetric.name %q resolves to reserved metric %q", name, full)
-	}
-	return full, nil
+	return metricNamePrefix + name, nil
 }
 
 // customMetricLabelNames returns the user-declared label names for a custom
@@ -379,6 +376,12 @@ type customSeriesKey struct {
 	joined string // \x1f-separated label tuple including ns + rule
 }
 
+// staleGaugeTickThreshold is how many consecutive refreshes a custom gauge
+// can stay empty (no SearchRule emitted samples for it) before the manager
+// unregisters it from the Prometheus registry. With the default
+// --rules-metrics-refresh-rate=10s this means ~5 minutes of inactivity.
+const staleGaugeTickThreshold = 30
+
 // customMetricManager owns dynamic GaugeVecs and the bookkeeping needed to
 // release stale series. It is goroutine-safe: every public method takes the
 // mutex.
@@ -390,6 +393,10 @@ type customMetricManager struct {
 	// with. A subsequent rule using the same metric name MUST declare the
 	// same labels in the same order.
 	labels map[string][]string
+	// idleTicks counts how many consecutive ticks we have not emitted any
+	// sample for a registered metric. Reset to 0 on every emission and
+	// once it exceeds staleGaugeTickThreshold the gauge is unregistered.
+	idleTicks map[string]int
 	// previous holds the series we emitted on the last tick keyed by both
 	// metric name and label tuple, so we can DeleteLabelValues the diff.
 	previousBasic  map[basicSeriesKey]struct{}
@@ -400,6 +407,7 @@ func newCustomMetricManager() *customMetricManager {
 	return &customMetricManager{
 		gauges:         map[string]*prometheus.GaugeVec{},
 		labels:         map[string][]string{},
+		idleTicks:      map[string]int{},
 		previousBasic:  map[basicSeriesKey]struct{}{},
 		previousCustom: map[customSeriesKey]struct{}{},
 	}
@@ -418,6 +426,9 @@ func (m *customMetricManager) gaugeFor(fullName, help string, labelNames []strin
 			return nil, fmt.Errorf("metric %q already registered with labels %v; cannot re-register with %v",
 				fullName, m.labels[fullName], labelNames)
 		}
+		// Reset the idle counter so a metric that bounces between empty
+		// ticks and active ones never falls into the stale-gauge GC.
+		m.idleTicks[fullName] = 0
 		return existing, nil
 	}
 	if help == "" {
@@ -458,7 +469,10 @@ func (m *customMetricManager) pruneBasic(metrics map[string]*prometheus.GaugeVec
 }
 
 // pruneCustom deletes label tuples on dynamically-registered gauges that
-// were absent from this tick.
+// were absent from this tick. Then it tracks per-gauge idle ticks: a gauge
+// that publishes zero samples for staleGaugeTickThreshold consecutive
+// refreshes is fully unregistered so the /metrics endpoint stops advertising
+// the empty gauge and the registry releases its memory.
 func (m *customMetricManager) pruneCustom(seen map[customSeriesKey]struct{}) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -473,6 +487,27 @@ func (m *customMetricManager) pruneCustom(seen map[customSeriesKey]struct{}) {
 		gauge.DeleteLabelValues(strings.Split(prev.joined, "\x1f")...)
 	}
 	m.previousCustom = seen
+
+	// idleTicks tracking: which metrics emitted at least one series this tick?
+	usedThisTick := map[string]struct{}{}
+	for k := range seen {
+		usedThisTick[k.metric] = struct{}{}
+	}
+	for name := range m.gauges {
+		if _, used := usedThisTick[name]; used {
+			m.idleTicks[name] = 0
+			continue
+		}
+		m.idleTicks[name]++
+		if m.idleTicks[name] >= staleGaugeTickThreshold {
+			if g := m.gauges[name]; g != nil {
+				prometheusRegistry.Unregister(g)
+			}
+			delete(m.gauges, name)
+			delete(m.labels, name)
+			delete(m.idleTicks, name)
+		}
+	}
 }
 
 func equalSlices(a, b []string) bool {
