@@ -186,10 +186,19 @@ func updateMetrics(ctx context.Context, rulesPool *pools.RulesStore) error {
 	// orphaned series at the end.
 	seenBasic := map[basicSeriesKey]struct{}{}
 	seenCustom := map[customSeriesKey]struct{}{}
+	// declarersThisTick tracks, for every custom metric, the set of
+	// SearchRule keys (ns/name) that declare it in their spec.
+	// Registration and GC of dynamic gauges hangs off this map: as long
+	// as any rule declares a metric, the gauge stays registered — even
+	// when its bucket list is empty (the typical case for sparse alerts
+	// like WAF blocked-requests, where the buckets only show up during
+	// an actual incident).
+	declarersThisTick := map[string]map[string]struct{}{}
 
 	for _, rule := range rules {
 		ns := rule.SearchRule.Namespace
 		ruleName := rule.SearchRule.Name
+		ruleKey := ns + "/" + ruleName
 
 		// --- legacy gauges -----------------------------------------------
 		if g, ok := defaultRuleMetrics["searchrule_value"]; ok {
@@ -214,6 +223,24 @@ func updateMetrics(ctx context.Context, rulesPool *pools.RulesStore) error {
 				logger.Info(fmt.Sprintf("custom metric on %s/%s rejected: %v", ns, ruleName, err))
 				continue
 			}
+
+			// Register the gauge unconditionally so /metrics keeps
+			// advertising the descriptor (HELP/TYPE) for every metric
+			// declared by a live SearchRule. If no aggregations data is
+			// available yet (the reconciler has not run a first sync, or
+			// the response had no buckets) we skip sample emission but
+			// the gauge stays registered.
+			labelNames := append([]string{"searchrule_namespace", "rule"}, customMetricLabelNames(cm)...)
+			gauge, err := customMgr.gaugeFor(fullName, cm.Help, labelNames)
+			if err != nil {
+				logger.Info(fmt.Sprintf("custom metric %q on %s/%s: %v", fullName, ns, ruleName, err))
+				continue
+			}
+			if declarersThisTick[fullName] == nil {
+				declarersThisTick[fullName] = map[string]struct{}{}
+			}
+			declarersThisTick[fullName][ruleKey] = struct{}{}
+
 			if rule.Aggregations == nil {
 				continue
 			}
@@ -225,12 +252,6 @@ func updateMetrics(ctx context.Context, rulesPool *pools.RulesStore) error {
 			if truncated {
 				customMetricsTruncated.WithLabelValues(ns, ruleName, fullName).Inc()
 			}
-			labelNames := append([]string{"searchrule_namespace", "rule"}, customMetricLabelNames(cm)...)
-			gauge, err := customMgr.gaugeFor(fullName, cm.Help, labelNames)
-			if err != nil {
-				logger.Info(fmt.Sprintf("custom metric %q on %s/%s: %v", fullName, ns, ruleName, err))
-				continue
-			}
 			for _, s := range samples {
 				values := append([]string{ns, ruleName}, s.labelValues...)
 				gauge.WithLabelValues(values...).Set(s.value)
@@ -241,8 +262,8 @@ func updateMetrics(ctx context.Context, rulesPool *pools.RulesStore) error {
 
 	// Drop orphaned basic series.
 	customMgr.pruneBasic(defaultRuleMetrics, seenBasic)
-	// Drop orphaned custom series.
-	customMgr.pruneCustom(seenCustom)
+	// Drop orphaned custom series + GC gauges with no live declarers.
+	customMgr.pruneCustom(seenCustom, declarersThisTick)
 	return nil
 }
 
@@ -367,15 +388,21 @@ type customSeriesKey struct {
 	joined string // \x1f-separated label tuple including ns + rule
 }
 
-// staleGaugeTickThreshold is how many consecutive refreshes a custom gauge
-// can stay empty (no SearchRule emitted samples for it) before the manager
-// unregisters it from the Prometheus registry. With the default
-// --rules-metrics-refresh-rate=10s this means ~5 minutes of inactivity.
-const staleGaugeTickThreshold = 30
-
 // customMetricManager owns dynamic GaugeVecs and the bookkeeping needed to
 // release stale series. It is goroutine-safe: every public method takes the
 // mutex.
+//
+// Lifecycle of a dynamic gauge:
+//   - Registered the first time a SearchRule declares it in
+//     spec.customMetrics (gaugeFor).
+//   - Stays registered as long as any live SearchRule declares it, even
+//     if every refresh tick yields zero samples. This is required for
+//     sparse alerts like Akamai WAF blocked-requests, where buckets only
+//     appear during an incident; otherwise the gauge would be GC'd and
+//     reappear cyclically, breaking PromQL alerts.
+//   - Unregistered (immediately) the first tick where no live rule
+//     declares it — i.e. every SearchRule that referenced it has been
+//     deleted or the customMetric entry was removed from the spec.
 type customMetricManager struct {
 	mu sync.Mutex
 	// gauges maps fullName -> registered GaugeVec.
@@ -384,10 +411,6 @@ type customMetricManager struct {
 	// with. A subsequent rule using the same metric name MUST declare the
 	// same labels in the same order.
 	labels map[string][]string
-	// idleTicks counts how many consecutive ticks we have not emitted any
-	// sample for a registered metric. Reset to 0 on every emission and
-	// once it exceeds staleGaugeTickThreshold the gauge is unregistered.
-	idleTicks map[string]int
 	// previous holds the series we emitted on the last tick keyed by both
 	// metric name and label tuple, so we can DeleteLabelValues the diff.
 	previousBasic  map[basicSeriesKey]struct{}
@@ -398,7 +421,6 @@ func newCustomMetricManager() *customMetricManager {
 	return &customMetricManager{
 		gauges:         map[string]*prometheus.GaugeVec{},
 		labels:         map[string][]string{},
-		idleTicks:      map[string]int{},
 		previousBasic:  map[basicSeriesKey]struct{}{},
 		previousCustom: map[customSeriesKey]struct{}{},
 	}
@@ -417,12 +439,6 @@ func (m *customMetricManager) gaugeFor(fullName, help string, labelNames []strin
 			return nil, fmt.Errorf("metric %q already registered with labels %v; cannot re-register with %v",
 				fullName, m.labels[fullName], labelNames)
 		}
-		// Note: do NOT reset idleTicks here. pruneCustom is the single
-		// authority on idleness — it resets the counter only when the
-		// gauge actually emitted samples this tick. Resetting here would
-		// keep a gauge alive forever even if every bucket fails the
-		// label/value extraction (e.g. a path that never exists), since
-		// updateMetrics calls gaugeFor BEFORE iterating samples.
 		return existing, nil
 	}
 	if help == "" {
@@ -463,11 +479,14 @@ func (m *customMetricManager) pruneBasic(metrics map[string]*prometheus.GaugeVec
 }
 
 // pruneCustom deletes label tuples on dynamically-registered gauges that
-// were absent from this tick. Then it tracks per-gauge idle ticks: a gauge
-// that publishes zero samples for staleGaugeTickThreshold consecutive
-// refreshes is fully unregistered so the /metrics endpoint stops advertising
-// the empty gauge and the registry releases its memory.
-func (m *customMetricManager) pruneCustom(seen map[customSeriesKey]struct{}) {
+// were absent from this tick, then GCs gauges whose set of declaring
+// SearchRules dropped to zero this tick. The previous "30 ticks without
+// samples" heuristic was wrong for sparse metrics: an Akamai WAF rule
+// only exposes buckets during an attack, so a quiet hour would
+// unregister the gauge and PromQL alerts on it would flap or evaluate
+// against nothing. As long as a SearchRule declares the metric in its
+// spec, the gauge stays registered (with zero samples if no buckets).
+func (m *customMetricManager) pruneCustom(seen map[customSeriesKey]struct{}, declarers map[string]map[string]struct{}) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for prev := range m.previousCustom {
@@ -482,25 +501,16 @@ func (m *customMetricManager) pruneCustom(seen map[customSeriesKey]struct{}) {
 	}
 	m.previousCustom = seen
 
-	// idleTicks tracking: which metrics emitted at least one series this tick?
-	usedThisTick := map[string]struct{}{}
-	for k := range seen {
-		usedThisTick[k.metric] = struct{}{}
-	}
+	// GC: a metric with no live declarer is unregistered immediately.
 	for name := range m.gauges {
-		if _, used := usedThisTick[name]; used {
-			m.idleTicks[name] = 0
+		if decl, ok := declarers[name]; ok && len(decl) > 0 {
 			continue
 		}
-		m.idleTicks[name]++
-		if m.idleTicks[name] >= staleGaugeTickThreshold {
-			if g := m.gauges[name]; g != nil {
-				prometheusRegistry.Unregister(g)
-			}
-			delete(m.gauges, name)
-			delete(m.labels, name)
-			delete(m.idleTicks, name)
+		if g := m.gauges[name]; g != nil {
+			prometheusRegistry.Unregister(g)
 		}
+		delete(m.gauges, name)
+		delete(m.labels, name)
 	}
 }
 
