@@ -321,64 +321,54 @@ func TestCustomMetricManager_GaugeFor_RejectsConflictingLabels(t *testing.T) {
 	}
 }
 
-func TestCustomMetricManager_PruneCustom_GarbageCollectsStale(t *testing.T) {
+func TestCustomMetricManager_PruneCustom_KeepsGaugeWhileDeclared(t *testing.T) {
 	t.Parallel()
+	// A WAF-style sparse metric: the SearchRule declares it but the
+	// underlying query returns zero buckets for many ticks. The gauge
+	// MUST stay registered as long as the SearchRule declares it.
 	m := newCustomMetricManager()
-	g := prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "searchrule_test_gc"}, []string{"searchrule_namespace", "rule", "host"})
-	// Note: we register on the package-level prometheusRegistry because the
-	// manager calls prometheusRegistry.Unregister directly.
+	g := prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "searchrule_test_sparse"}, []string{"searchrule_namespace", "rule", "host"})
 	if err := prometheusRegistry.Register(g); err != nil {
 		t.Fatalf("register: %v", err)
 	}
 	defer prometheusRegistry.Unregister(g)
-	m.gauges["searchrule_test_gc"] = g
-	m.labels["searchrule_test_gc"] = []string{"searchrule_namespace", "rule", "host"}
+	m.gauges["searchrule_test_sparse"] = g
+	m.labels["searchrule_test_sparse"] = []string{"searchrule_namespace", "rule", "host"}
 
-	// First tick: emit one series so the manager records previousCustom for it.
-	g.WithLabelValues("ns", "rule", "host1").Set(1)
-	seenFirst := map[customSeriesKey]struct{}{
-		{metric: "searchrule_test_gc", joined: "ns\x1frule\x1fhost1"}: {},
+	declared := map[string]map[string]struct{}{
+		"searchrule_test_sparse": {"searchruler/sparse-rule": {}},
 	}
-	m.pruneCustom(seenFirst)
-	if _, ok := m.gauges["searchrule_test_gc"]; !ok {
-		t.Fatalf("gauge should still be registered after first emission")
+	for i := 0; i < 100; i++ {
+		m.pruneCustom(map[customSeriesKey]struct{}{}, declared)
 	}
-
-	// Subsequent empty ticks: simulate staleGaugeTickThreshold ticks with
-	// no samples. After the threshold the gauge must be unregistered.
-	for i := 0; i < staleGaugeTickThreshold; i++ {
-		m.pruneCustom(map[customSeriesKey]struct{}{})
-	}
-	if _, ok := m.gauges["searchrule_test_gc"]; ok {
-		t.Fatalf("gauge should have been GC'd after %d empty ticks", staleGaugeTickThreshold)
+	if _, ok := m.gauges["searchrule_test_sparse"]; !ok {
+		t.Fatalf("gauge should still be registered after 100 empty ticks while a rule declares it")
 	}
 }
 
-func TestCustomMetricManager_PruneCustom_ResetsIdleOnReuse(t *testing.T) {
+func TestCustomMetricManager_PruneCustom_GarbageCollectsWhenNoDeclarer(t *testing.T) {
 	t.Parallel()
 	m := newCustomMetricManager()
-	g := prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "searchrule_test_reuse"}, []string{"searchrule_namespace", "rule", "host"})
+	g := prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "searchrule_test_gc_decl"}, []string{"searchrule_namespace", "rule", "host"})
 	if err := prometheusRegistry.Register(g); err != nil {
 		t.Fatalf("register: %v", err)
 	}
 	defer prometheusRegistry.Unregister(g)
-	m.gauges["searchrule_test_reuse"] = g
-	m.labels["searchrule_test_reuse"] = []string{"searchrule_namespace", "rule", "host"}
+	m.gauges["searchrule_test_gc_decl"] = g
+	m.labels["searchrule_test_gc_decl"] = []string{"searchrule_namespace", "rule", "host"}
 
-	// Several empty ticks short of the GC threshold.
-	for i := 0; i < staleGaugeTickThreshold-1; i++ {
-		m.pruneCustom(map[customSeriesKey]struct{}{})
+	// First tick: at least one rule declares the metric.
+	declared := map[string]map[string]struct{}{
+		"searchrule_test_gc_decl": {"searchruler/r1": {}},
 	}
-	// One tick with samples must reset the counter.
-	m.pruneCustom(map[customSeriesKey]struct{}{
-		{metric: "searchrule_test_reuse", joined: "ns\x1frule\x1fh"}: {},
-	})
-	// Another full streak of empty ticks; the gauge must survive because the
-	// reset happened mid-streak.
-	for i := 0; i < staleGaugeTickThreshold-1; i++ {
-		m.pruneCustom(map[customSeriesKey]struct{}{})
+	m.pruneCustom(map[customSeriesKey]struct{}{}, declared)
+	if _, ok := m.gauges["searchrule_test_gc_decl"]; !ok {
+		t.Fatalf("gauge should be registered while declared")
 	}
-	if _, ok := m.gauges["searchrule_test_reuse"]; !ok {
-		t.Fatalf("gauge should still be registered; idle counter reset failed")
+
+	// SearchRule is deleted from the cluster: declarers becomes empty.
+	m.pruneCustom(map[customSeriesKey]struct{}{}, map[string]map[string]struct{}{})
+	if _, ok := m.gauges["searchrule_test_gc_decl"]; ok {
+		t.Fatalf("gauge should have been GC'd the very first tick after the last declarer disappeared")
 	}
 }
