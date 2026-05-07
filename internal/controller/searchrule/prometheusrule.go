@@ -158,20 +158,28 @@ func (r *SearchRuleReconciler) reconcilePrometheusRule(ctx context.Context, rule
 	logger.V(1).Info("PrometheusRule reconciled",
 		"operation", op, "name", pr.Name, "namespace", pr.Namespace)
 
-	// Surface the unmatched metricName selector as a non-blocking warning
-	// in the status. The PrometheusRule was still created (using the
-	// fallback metric) so behavior is predictable, but the user gets a
-	// clear signal that the typo is silently routing to a different gauge.
-	if _, fallback := chooseAlertMetric(rule); fallback != "" {
-		r.UpdateConditionPrometheusRuleMetricNameMismatch(rule, fallback)
-		return nil
+	// status.conditions[type=PrometheusRule] can hold a single reason at a
+	// time, so when several issues coexist we prioritise the one that has
+	// the worst operational impact and append the rest to the message:
+	//
+	//   1. MetricsNotExposed — the alert can never fire, regardless of how
+	//      well-formed the rest of the spec is. This must surface first.
+	//   2. MetricNameMismatch — the alert WILL fire but probably against
+	//      the wrong gauge (typo in spec.prometheusRule.metricName).
+	//   3. Synced — everything reconciled cleanly.
+	_, mismatchReason := chooseAlertMetric(rule)
+	switch {
+	case !r.MetricsExposed:
+		msg := globals.ConditionReasonPrometheusRuleMetricsNotExposedMessage
+		if mismatchReason != "" {
+			msg = fmt.Sprintf("%s; additionally, %s", msg, mismatchReason)
+		}
+		r.UpdateConditionPrometheusRuleMetricsNotExposedWithMessage(rule, msg)
+	case mismatchReason != "":
+		r.UpdateConditionPrometheusRuleMetricNameMismatch(rule, mismatchReason)
+	default:
+		r.UpdateConditionPrometheusRuleSynced(rule)
 	}
-
-	if !r.MetricsExposed {
-		r.UpdateConditionPrometheusRuleMetricsNotExposed(rule)
-		return nil
-	}
-	r.UpdateConditionPrometheusRuleSynced(rule)
 	return nil
 }
 

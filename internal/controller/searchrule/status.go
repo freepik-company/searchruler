@@ -164,8 +164,18 @@ func (r *SearchRuleReconciler) UpdateConditionPrometheusRuleUnsupported(searchRu
 // PrometheusRule was created but the underlying metric is not being served by
 // the operator (--rules-metrics-bind-address=0).
 func (r *SearchRuleReconciler) UpdateConditionPrometheusRuleMetricsNotExposed(searchRule *v1alpha1.SearchRule) {
+	r.UpdateConditionPrometheusRuleMetricsNotExposedWithMessage(searchRule,
+		globals.ConditionReasonPrometheusRuleMetricsNotExposedMessage)
+}
+
+// UpdateConditionPrometheusRuleMetricsNotExposedWithMessage is the variant
+// used when the operator wants to compose the standard "metrics endpoint
+// disabled" warning with additional context (e.g. a concurrent
+// MetricNameMismatch). The status type/reason stay the same so existing
+// alerts looking at `reason="MetricsNotExposed"` keep working.
+func (r *SearchRuleReconciler) UpdateConditionPrometheusRuleMetricsNotExposedWithMessage(searchRule *v1alpha1.SearchRule, message string) {
 	condition := globals.NewCondition(globals.ConditionTypePrometheusRule, metav1.ConditionTrue,
-		globals.ConditionReasonPrometheusRuleMetricsNotExposedType, globals.ConditionReasonPrometheusRuleMetricsNotExposedMessage)
+		globals.ConditionReasonPrometheusRuleMetricsNotExposedType, message)
 	globals.UpdateCondition(&searchRule.Status.Conditions, condition)
 }
 
