@@ -98,6 +98,97 @@ func TestPromqlOperator(t *testing.T) {
 	}
 }
 
+func TestChooseAlertMetric(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name         string
+		rule         *searchrulerv1alpha1.SearchRule
+		want         string
+		wantFallback bool
+	}{
+		{
+			name: "no customMetrics falls back to legacy",
+			rule: newSearchRule(nil),
+			want: "searchrule_value",
+		},
+		{
+			name: "single custom metric is selected",
+			rule: newSearchRule(func(r *searchrulerv1alpha1.SearchRule) {
+				r.Spec.CustomMetrics = []searchrulerv1alpha1.CustomMetric{{Name: "akamai_5xx_by_host"}}
+			}),
+			want: "searchrule_akamai_5xx_by_host",
+		},
+		{
+			name: "first custom metric wins when no MetricName selector",
+			rule: newSearchRule(func(r *searchrulerv1alpha1.SearchRule) {
+				r.Spec.CustomMetrics = []searchrulerv1alpha1.CustomMetric{
+					{Name: "primary"},
+					{Name: "secondary"},
+				}
+				r.Spec.PrometheusRule = &searchrulerv1alpha1.PrometheusRuleSpec{Enabled: true}
+			}),
+			want: "searchrule_primary",
+		},
+		{
+			name: "MetricName selector picks the matching metric",
+			rule: newSearchRule(func(r *searchrulerv1alpha1.SearchRule) {
+				r.Spec.CustomMetrics = []searchrulerv1alpha1.CustomMetric{
+					{Name: "primary"},
+					{Name: "secondary"},
+				}
+				r.Spec.PrometheusRule = &searchrulerv1alpha1.PrometheusRuleSpec{
+					Enabled:    true,
+					MetricName: "secondary",
+				}
+			}),
+			want: "searchrule_secondary",
+		},
+		{
+			name: "unknown MetricName falls back to first entry and surfaces a reason",
+			rule: newSearchRule(func(r *searchrulerv1alpha1.SearchRule) {
+				r.Spec.CustomMetrics = []searchrulerv1alpha1.CustomMetric{
+					{Name: "primary"},
+					{Name: "secondary"},
+				}
+				r.Spec.PrometheusRule = &searchrulerv1alpha1.PrometheusRuleSpec{
+					Enabled:    true,
+					MetricName: "ghost",
+				}
+			}),
+			want:         "searchrule_primary",
+			wantFallback: true,
+		},
+	}
+	for _, c := range cases {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			got, fallback := chooseAlertMetric(c.rule)
+			if got != c.want {
+				t.Fatalf("got=%q want=%q", got, c.want)
+			}
+			if (fallback != "") != c.wantFallback {
+				t.Fatalf("fallback=%q wantFallback=%v", fallback, c.wantFallback)
+			}
+		})
+	}
+}
+
+func TestBuildPromQLExpr_UsesCustomMetric(t *testing.T) {
+	t.Parallel()
+	rule := newSearchRule(func(r *searchrulerv1alpha1.SearchRule) {
+		r.Spec.CustomMetrics = []searchrulerv1alpha1.CustomMetric{{Name: "akamai_5xx_by_host"}}
+	})
+	got, err := buildPromQLExpr(rule)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	want := `searchrule_akamai_5xx_by_host{searchrule_namespace="default",rule="demo"} > 100`
+	if got != want {
+		t.Fatalf("got=%q\nwant=%q", got, want)
+	}
+}
+
 func TestBuildPromQLExpr(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -300,7 +391,7 @@ func TestReconcilePrometheusRule_Disabled_NoOp(t *testing.T) {
 	r := &SearchRuleReconciler{Client: c, Scheme: scheme, PrometheusRuleSupported: true, MetricsExposed: true}
 
 	rule := newSearchRule(nil) // PrometheusRule is nil
-	if err := r.reconcilePrometheusRule(context.Background(), rule); err != nil {
+	if err := r.reconcilePrometheusRule(context.Background(), rule, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -320,7 +411,7 @@ func TestReconcilePrometheusRule_Unsupported_SetsCondition(t *testing.T) {
 	rule := newSearchRule(func(sr *searchrulerv1alpha1.SearchRule) {
 		sr.Spec.PrometheusRule = &searchrulerv1alpha1.PrometheusRuleSpec{Enabled: true}
 	})
-	if err := r.reconcilePrometheusRule(context.Background(), rule); err != nil {
+	if err := r.reconcilePrometheusRule(context.Background(), rule, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -350,7 +441,7 @@ func TestReconcilePrometheusRule_Enabled_CreatesResourceWithOwnerRef(t *testing.
 		}
 	})
 
-	if err := r.reconcilePrometheusRule(context.Background(), rule); err != nil {
+	if err := r.reconcilePrometheusRule(context.Background(), rule, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -390,7 +481,7 @@ func TestReconcilePrometheusRule_MetricsNotExposed_SetsWarningCondition(t *testi
 	rule := newSearchRule(func(sr *searchrulerv1alpha1.SearchRule) {
 		sr.Spec.PrometheusRule = &searchrulerv1alpha1.PrometheusRuleSpec{Enabled: true}
 	})
-	if err := r.reconcilePrometheusRule(context.Background(), rule); err != nil {
+	if err := r.reconcilePrometheusRule(context.Background(), rule, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -415,7 +506,7 @@ func TestReconcilePrometheusRule_DisabledAfterEnabled_DeletesResource(t *testing
 	c := fake.NewClientBuilder().WithScheme(scheme).Build()
 	r := &SearchRuleReconciler{Client: c, Scheme: scheme, PrometheusRuleSupported: true, MetricsExposed: true}
 
-	if err := r.reconcilePrometheusRule(context.Background(), rule); err != nil {
+	if err := r.reconcilePrometheusRule(context.Background(), rule, false); err != nil {
 		t.Fatalf("first reconcile: %v", err)
 	}
 	if !hasCondition(rule.Status.Conditions, "PrometheusRule", "Synced") {
@@ -424,7 +515,7 @@ func TestReconcilePrometheusRule_DisabledAfterEnabled_DeletesResource(t *testing
 
 	// User flips enabled to false.
 	rule.Spec.PrometheusRule.Enabled = false
-	if err := r.reconcilePrometheusRule(context.Background(), rule); err != nil {
+	if err := r.reconcilePrometheusRule(context.Background(), rule, false); err != nil {
 		t.Fatalf("second reconcile: %v", err)
 	}
 
@@ -461,7 +552,7 @@ func TestReconcilePrometheusRule_RefusesToAdoptUnmanagedResource(t *testing.T) {
 	rule := newSearchRule(func(sr *searchrulerv1alpha1.SearchRule) {
 		sr.Spec.PrometheusRule = &searchrulerv1alpha1.PrometheusRuleSpec{Enabled: true}
 	})
-	err := r.reconcilePrometheusRule(context.Background(), rule)
+	err := r.reconcilePrometheusRule(context.Background(), rule, false)
 	if err == nil {
 		t.Fatalf("expected error when PrometheusRule is not owned by the SearchRule")
 	}
@@ -492,7 +583,7 @@ func TestDeletePrometheusRuleIfExists_SkipsUnmanagedResource(t *testing.T) {
 	r := &SearchRuleReconciler{Client: c, Scheme: scheme, PrometheusRuleSupported: true, MetricsExposed: true}
 
 	rule := newSearchRule(nil) // no PrometheusRule spec — would normally trigger cleanup
-	if err := r.reconcilePrometheusRule(context.Background(), rule); err != nil {
+	if err := r.reconcilePrometheusRule(context.Background(), rule, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	got := &monitoringv1.PrometheusRule{}

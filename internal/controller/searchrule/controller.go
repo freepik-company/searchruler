@@ -138,7 +138,25 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}()
 
-	// 6. Reconcile the auto-generated PrometheusRule first so a transition
+	// 6. Validate spec.customMetrics regardless of whether prometheusRule is
+	// enabled. The metrics goroutine will try to register a GaugeVec for
+	// every entry on each refresh tick; a malformed name or label there
+	// would only land in logs. Surfacing the issue as a status condition
+	// here gives `kubectl get searchrule` a single, authoritative place to
+	// read the misconfiguration regardless of the SearchRule's output mix.
+	//
+	// We deliberately do NOT short-circuit on a validation failure:
+	// reconcilePrometheusRule still has to run so a previously-generated
+	// PrometheusRule (from when customMetrics was valid) is cleaned up,
+	// and Sync still has to run so the existing actionRef pipeline keeps
+	// delivering. The condition is the visible signal; the rest of the
+	// reconcile keeps going on its degraded path.
+	customMetricsErr := firstCustomMetricValidationError(searchRuleResource.Spec.CustomMetrics)
+	if customMetricsErr != nil {
+		r.UpdateConditionPrometheusRuleCustomMetricsInvalid(searchRuleResource, customMetricsErr.Error())
+	}
+
+	// 7. Reconcile the auto-generated PrometheusRule first so a transition
 	// from "enabled" to "disabled" (or to "no outputs at all") deletes the
 	// existing PrometheusRule before any short-circuit return below. If we
 	// returned earlier on MissingOutput, a previously-created PrometheusRule
@@ -149,7 +167,12 @@ func (r *SearchRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// independent and must keep working when the prometheus-operator side
 	// has a transient API error or a name conflict. The error is collected
 	// so controller-runtime still requeues with backoff.
-	prErr := r.reconcilePrometheusRule(ctx, searchRuleResource)
+	//
+	// When customMetrics is invalid we route through reconcilePrometheusRule
+	// in cleanup-only mode: it keeps any existing PrometheusRule from this
+	// rule deleted (so we do not leak alerts) but it does not try to render
+	// a new one against the broken metric.
+	prErr := r.reconcilePrometheusRule(ctx, searchRuleResource, customMetricsErr != nil)
 	if prErr != nil {
 		logger.Info(fmt.Sprintf("failed to reconcile PrometheusRule for %s: %s",
 			req.NamespacedName, prErr.Error()))

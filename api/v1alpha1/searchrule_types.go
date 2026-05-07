@@ -54,11 +54,53 @@ type QueryConnectorRef struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
-// MetricLabels TODO
+// MetricLabel describes how to extract a single Prometheus label from each
+// bucket emitted by a CustomMetric. Value is a gjson path resolved against
+// the bucket object (e.g. `key`, `error_percentage.value`). When StaticValue
+// is true, Value is emitted verbatim instead of being treated as a path —
+// useful for tagging every sample of a metric with a constant label.
 type MetricLabel struct {
 	Name        string `json:"name"`
 	Value       string `json:"value"`
 	StaticValue bool   `json:"staticValue,omitempty"`
+}
+
+// CustomMetric exposes a Prometheus gauge derived from a list of buckets in
+// the Elasticsearch response. The operator iterates AggregationMap (a gjson
+// path to an array — typically a `terms` aggregation's `buckets`) and emits
+// one sample per bucket with Labels mapped from the bucket fields and the
+// numeric Value extracted from another path within the bucket. The metric
+// is registered as `searchrule_<Name>` and always carries the additional
+// labels `searchrule_namespace` and `rule` so multiple SearchRules can share
+// the same custom metric name without collision.
+type CustomMetric struct {
+	// Name is the suffix of the Prometheus metric name. The exposed metric
+	// is `searchrule_<Name>`. Must match `[a-zA-Z_][a-zA-Z_0-9]*` and must
+	// not collide with the operator's reserved names (`value`, `state`).
+	// +kubebuilder:validation:Pattern=`^[a-zA-Z_][a-zA-Z_0-9]*$`
+	Name string `json:"name"`
+
+	// Help is the Prometheus HELP text. Defaults to a generic description.
+	Help string `json:"help,omitempty"`
+
+	// AggregationMap is a gjson path to an array of buckets, evaluated
+	// against the contents of the Elasticsearch response's top-level
+	// `aggregations` block (NOT the full response). For a query whose
+	// response is `{"aggregations": {"by_domain": {"buckets": [...]}}}`
+	// the right value is `by_domain.buckets`. If the path resolves to a
+	// single object instead of an array, the operator emits a single
+	// sample.
+	AggregationMap string `json:"aggregation_map"`
+
+	// Labels are extracted from each bucket and attached to the sample.
+	Labels []MetricLabel `json:"labels,omitempty"`
+
+	// Value is the gjson path inside a bucket whose numeric content is
+	// emitted as the gauge value. Defaults to `doc_count` when empty so a
+	// bare `terms` aggregation works without configuration; for pipeline
+	// aggregations such as `max_bucket` or `bucket_script`, set this
+	// explicitly to e.g. `error_percentage.value` or `value`.
+	Value string `json:"value,omitempty"`
 }
 
 // PrometheusRuleSpec configures the auto-generated PrometheusRule (CRD from
@@ -74,6 +116,13 @@ type PrometheusRuleSpec struct {
 	// AlertName overrides the alert name in the generated PrometheusRule.
 	// Defaults to the SearchRule name.
 	AlertName string `json:"alertName,omitempty"`
+
+	// MetricName selects which entry of spec.customMetrics the generated
+	// PromQL targets when the SearchRule defines more than one. Must match
+	// one of customMetrics[*].name. When unset, the first custom metric is
+	// used. Ignored when customMetrics is empty (the legacy
+	// `searchrule_value` metric is used instead).
+	MetricName string `json:"metricName,omitempty"`
 
 	// Labels are merged into the alert labels.
 	Labels map[string]string `json:"labels,omitempty"`
@@ -91,6 +140,15 @@ type SearchRuleSpec struct {
 	Condition         Condition           `json:"condition"`
 	ActionRef         *ActionRef          `json:"actionRef,omitempty"`
 	PrometheusRule    *PrometheusRuleSpec `json:"prometheusRule,omitempty"`
+
+	// CustomMetrics declares Prometheus gauges derived from the
+	// Elasticsearch response aggregations. Each entry produces one
+	// `searchrule_<Name>` metric with one sample per bucket of the
+	// referenced aggregation. Useful when a SearchRule's condition is built
+	// on top of a `max_bucket`/`min_bucket` aggregation and the alert needs
+	// to expose the dimension that the bucket grouped by.
+	// +kubebuilder:validation:MaxItems=10
+	CustomMetrics []CustomMetric `json:"customMetrics,omitempty"`
 }
 
 // SearchRuleStatus defines the observed state of SearchRule.

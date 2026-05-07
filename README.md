@@ -477,6 +477,55 @@ Prerequisites and caveats:
 - The custom-metrics endpoint must be enabled with `--rules-metrics-bind-address`, otherwise the underlying `searchrule_value` metric is never exported and the alert can never fire. In that case the SearchRule still gets a PrometheusRule, but it is marked with `PrometheusRule.MetricsNotExposed` in `status.conditions` so the misconfiguration is visible.
 - A `ServiceMonitor` (or `PodMonitor`) targeting the operator's metrics service must exist for Prometheus to actually scrape the metric. The chart's `controller.customMetrics.service` enables the Service; you provision the ServiceMonitor according to your Prometheus deployment.
 
+#### 🧮 Custom metrics with bucket dimensions
+
+By default, the generated PrometheusRule alerts on `searchrule_value` — a single gauge that holds the resolved `conditionField`. That works when the value already represents the whole rule (e.g. a count), but it loses information when the underlying query is a `terms` aggregation reduced to a scalar via `max_bucket` or similar. The classic case: an aggregation that groups 5xx percentages **by host** so you can act on the dominant offender.
+
+`spec.customMetrics` lets the operator emit one Prometheus sample per bucket of the response, with labels mapped from the bucket fields:
+
+```yaml
+spec:
+  # …queryConnectorRef, checkInterval, elasticsearch, condition unchanged…
+
+  customMetrics:
+    - name: akamai_5xx_by_host          # exposes searchrule_akamai_5xx_by_host
+      help: "Akamai 5xx percentage by host (last 5m)"
+      aggregation_map: by_domain.buckets
+      labels:
+        - name: host
+          value: key                    # gjson path inside each bucket
+      value: error_percentage.value     # defaults to `doc_count` when empty
+
+  prometheusRule:
+    enabled: true
+    alertName: Akamai5xxByHostHighRate
+    # metricName: akamai_5xx_by_host    # optional selector when several customMetrics declared
+    labels:
+      severity: critical
+    annotations:
+      summary: "High 5xx percentage by host (last 5m)"
+      description: "Host {{ $labels.host }} at {{ $value | humanizePercentage }} 5xx"
+```
+
+What the operator publishes on `/metrics`:
+
+```
+searchrule_akamai_5xx_by_host{searchrule_namespace="searchruler",rule="…",host="cp.freepik.com"} 22.43
+searchrule_akamai_5xx_by_host{searchrule_namespace="searchruler",rule="…",host="www.freepik.com"} 0.40
+```
+
+The auto-generated PrometheusRule targets that metric instead of `searchrule_value`, so Alertmanager receives one alert per bucket above the threshold with the bucket labels attached:
+
+```
+ALERTS{alertname="Akamai5xxByHostHighRate", host="cp.freepik.com", severity="critical", …}
+```
+
+Notes:
+- The series set is reset every refresh tick (default 10s). When a bucket disappears from the query response (host stops failing), the series is deleted from `/metrics` automatically — no stale firing alerts.
+- `searchrule_namespace` and `rule` are added implicitly so multiple SearchRules can publish under the same metric name without colliding.
+- The bucket count is capped at 1000 per refresh; truncations are observable through the `searchrule_custom_metrics_truncated_total{rule="…",metric="…"}` counter.
+- A SearchRule may declare up to 10 entries in `customMetrics`. The very first one is the default target of the generated PrometheusRule expression; pick another with `prometheusRule.metricName`.
+
 ## Templating engine
 
 ❤️ Special mention to [Notifik](https://github.com/freepik-company/notifik/tree/master)

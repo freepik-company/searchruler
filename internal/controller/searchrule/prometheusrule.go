@@ -64,7 +64,7 @@ const (
 //     normal sync loop continues.
 //   - Otherwise, a PrometheusRule named after the SearchRule is created or
 //     updated, owned by the SearchRule for automatic GC.
-func (r *SearchRuleReconciler) reconcilePrometheusRule(ctx context.Context, rule *v1alpha1.SearchRule) error {
+func (r *SearchRuleReconciler) reconcilePrometheusRule(ctx context.Context, rule *v1alpha1.SearchRule, cleanupOnly bool) error {
 	logger := log.FromContext(ctx)
 
 	desired := rule.Spec.PrometheusRule
@@ -73,8 +73,16 @@ func (r *SearchRuleReconciler) reconcilePrometheusRule(ctx context.Context, rule
 	// and clear any stale status condition. Otherwise a SearchRule that used
 	// to report PrometheusRule.Synced would keep showing that state long
 	// after the feature was turned off.
-	if desired == nil || !desired.Enabled {
-		globals.RemoveCondition(&rule.Status.Conditions, globals.ConditionTypePrometheusRule)
+	//
+	// cleanupOnly is set by the main Reconcile loop when spec.customMetrics
+	// is structurally invalid: even if prometheusRule.enabled is true we
+	// must not try to render a rule against the broken gauge, but we still
+	// want to delete any PrometheusRule we created in a previous good run
+	// so we do not leak a stale alert in Alertmanager.
+	if desired == nil || !desired.Enabled || cleanupOnly {
+		if !cleanupOnly {
+			globals.RemoveCondition(&rule.Status.Conditions, globals.ConditionTypePrometheusRule)
+		}
 		if !r.PrometheusRuleSupported {
 			return nil
 		}
@@ -89,6 +97,10 @@ func (r *SearchRuleReconciler) reconcilePrometheusRule(ctx context.Context, rule
 			"searchrule", rule.Name, "namespace", rule.Namespace)
 		return nil
 	}
+
+	// Note: customMetrics validation lives in the main Reconcile flow so
+	// it covers SearchRules that opt out of prometheusRule too. By the
+	// time we are here, every cm.Validate() has already passed.
 
 	expr, err := buildPromQLExpr(rule)
 	if err != nil {
@@ -147,11 +159,28 @@ func (r *SearchRuleReconciler) reconcilePrometheusRule(ctx context.Context, rule
 	logger.V(1).Info("PrometheusRule reconciled",
 		"operation", op, "name", pr.Name, "namespace", pr.Namespace)
 
-	if !r.MetricsExposed {
-		r.UpdateConditionPrometheusRuleMetricsNotExposed(rule)
-		return nil
+	// status.conditions[type=PrometheusRule] can hold a single reason at a
+	// time, so when several issues coexist we prioritise the one that has
+	// the worst operational impact and append the rest to the message:
+	//
+	//   1. MetricsNotExposed — the alert can never fire, regardless of how
+	//      well-formed the rest of the spec is. This must surface first.
+	//   2. MetricNameMismatch — the alert WILL fire but probably against
+	//      the wrong gauge (typo in spec.prometheusRule.metricName).
+	//   3. Synced — everything reconciled cleanly.
+	_, mismatchReason := chooseAlertMetric(rule)
+	switch {
+	case !r.MetricsExposed:
+		msg := globals.ConditionReasonPrometheusRuleMetricsNotExposedMessage
+		if mismatchReason != "" {
+			msg = fmt.Sprintf("%s; additionally, %s", msg, mismatchReason)
+		}
+		r.UpdateConditionPrometheusRuleMetricsNotExposedWithMessage(rule, msg)
+	case mismatchReason != "":
+		r.UpdateConditionPrometheusRuleMetricNameMismatch(rule, mismatchReason)
+	default:
+		r.UpdateConditionPrometheusRuleSynced(rule)
 	}
-	r.UpdateConditionPrometheusRuleSynced(rule)
 	return nil
 }
 
@@ -180,11 +209,13 @@ func buildAlertingRule(rule *v1alpha1.SearchRule, expr string, forDuration monit
 		labels = mergeLabels(labels, rule.Spec.PrometheusRule.Labels)
 	}
 
+	metric, _ := chooseAlertMetric(rule)
 	annotations := map[string]string{
 		"description": fmt.Sprintf(
-			"SearchRule %s/%s condition (%s %s %s) is firing on metric searchrule_value.",
+			"SearchRule %s/%s condition (%s %s %s) is firing on metric %s.",
 			rule.Namespace, rule.Name,
 			rule.Spec.Condition.Operator, "threshold", rule.Spec.Condition.Threshold,
+			metric,
 		),
 	}
 	if rule.Spec.PrometheusRule != nil {
@@ -201,12 +232,16 @@ func buildAlertingRule(rule *v1alpha1.SearchRule, expr string, forDuration monit
 }
 
 // buildPromQLExpr translates a SearchRule's condition into a PromQL
-// expression on the searchrule_value metric exposed by the operator.
-// The selector includes both searchrule_namespace and rule labels because
-// SearchRule names are unique only within a namespace, so two rules with the
-// same name in different namespaces would otherwise share the same time
-// series. The label is `searchrule_namespace` (not `namespace`) to avoid the
-// ServiceMonitor target-label collision described in metrics.go.
+// expression. By default it filters the global `searchrule_value` gauge by
+// namespace+rule. When the SearchRule declares spec.customMetrics the
+// operator picks the relevant custom gauge (which carries the per-bucket
+// dimensions) so the resulting alert in Alertmanager fires once per bucket
+// over the threshold and inherits the bucket labels (e.g. `host="cp.freepik.com"`).
+//
+// Selector includes both searchrule_namespace and rule labels because
+// SearchRule names are unique only within a namespace. The label is
+// `searchrule_namespace` (not `namespace`) to avoid the ServiceMonitor
+// target-label collision described in metrics.go.
 //
 // The threshold is parsed as a float and re-rendered before being inlined.
 // We never embed the user-provided string directly: it would let a SearchRule
@@ -225,10 +260,61 @@ func buildPromQLExpr(rule *v1alpha1.SearchRule) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("condition.threshold %q is not a valid float: %w", rawThreshold, err)
 	}
+	thresholdStr := strconv.FormatFloat(threshold, 'f', -1, 64)
+	metric, _ := chooseAlertMetric(rule)
 	// strconv.FormatFloat with -1 precision keeps the shortest representation
 	// that round-trips, so "100" stays "100" and "0.5" stays "0.5".
-	return fmt.Sprintf(`searchrule_value{searchrule_namespace=%q,rule=%q} %s %s`,
-		rule.Namespace, rule.Name, op, strconv.FormatFloat(threshold, 'f', -1, 64)), nil
+	return fmt.Sprintf(`%s{searchrule_namespace=%q,rule=%q} %s %s`,
+		metric, rule.Namespace, rule.Name, op, thresholdStr), nil
+}
+
+// firstCustomMetricValidationError walks spec.customMetrics in order and
+// returns the first Validate() failure, if any. Used by the main Reconcile
+// loop to surface the misconfiguration as a status condition without
+// blocking the rest of the reconcile (PrometheusRule cleanup, actionRef
+// pipeline) — see the cleanupOnly flag on reconcilePrometheusRule.
+func firstCustomMetricValidationError(metrics []v1alpha1.CustomMetric) error {
+	for _, cm := range metrics {
+		if err := cm.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// chooseAlertMetric returns the Prometheus metric name the generated alert
+// should target. When customMetrics is empty we fall back to the legacy
+// `searchrule_value`. With one entry, we use it. With several, we honour
+// `spec.prometheusRule.metricName` if it matches a declared name; otherwise
+// we default to the first one.
+//
+// fallbackReason is non-empty when the chosen metric does not strictly match
+// what the user asked for (typo in metricName, etc). The caller surfaces it
+// as a status condition so the misconfiguration is visible instead of
+// silently routing alerts to the wrong gauge.
+func chooseAlertMetric(rule *v1alpha1.SearchRule) (metric, fallbackReason string) {
+	const legacy = "searchrule_value"
+	if len(rule.Spec.CustomMetrics) == 0 {
+		return legacy, ""
+	}
+	preferred := ""
+	if rule.Spec.PrometheusRule != nil {
+		preferred = rule.Spec.PrometheusRule.MetricName
+	}
+	if preferred != "" {
+		for _, cm := range rule.Spec.CustomMetrics {
+			if cm.Name == preferred {
+				return "searchrule_" + cm.Name, ""
+			}
+		}
+		// metricName was set but no customMetrics entry matched. Fall back
+		// to the first one and tell the caller so the SearchRule's status
+		// reflects the typo.
+		return "searchrule_" + rule.Spec.CustomMetrics[0].Name,
+			fmt.Sprintf("spec.prometheusRule.metricName=%q does not match any spec.customMetrics[*].name; falling back to %q",
+				preferred, rule.Spec.CustomMetrics[0].Name)
+	}
+	return "searchrule_" + rule.Spec.CustomMetrics[0].Name, ""
 }
 
 // promqlOperator maps a SearchRule condition operator to its PromQL syntax.

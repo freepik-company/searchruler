@@ -164,8 +164,18 @@ func (r *SearchRuleReconciler) UpdateConditionPrometheusRuleUnsupported(searchRu
 // PrometheusRule was created but the underlying metric is not being served by
 // the operator (--rules-metrics-bind-address=0).
 func (r *SearchRuleReconciler) UpdateConditionPrometheusRuleMetricsNotExposed(searchRule *v1alpha1.SearchRule) {
+	r.UpdateConditionPrometheusRuleMetricsNotExposedWithMessage(searchRule,
+		globals.ConditionReasonPrometheusRuleMetricsNotExposedMessage)
+}
+
+// UpdateConditionPrometheusRuleMetricsNotExposedWithMessage is the variant
+// used when the operator wants to compose the standard "metrics endpoint
+// disabled" warning with additional context (e.g. a concurrent
+// MetricNameMismatch). The status type/reason stay the same so existing
+// alerts looking at `reason="MetricsNotExposed"` keep working.
+func (r *SearchRuleReconciler) UpdateConditionPrometheusRuleMetricsNotExposedWithMessage(searchRule *v1alpha1.SearchRule, message string) {
 	condition := globals.NewCondition(globals.ConditionTypePrometheusRule, metav1.ConditionTrue,
-		globals.ConditionReasonPrometheusRuleMetricsNotExposedType, globals.ConditionReasonPrometheusRuleMetricsNotExposedMessage)
+		globals.ConditionReasonPrometheusRuleMetricsNotExposedType, message)
 	globals.UpdateCondition(&searchRule.Status.Conditions, condition)
 }
 
@@ -175,6 +185,29 @@ func (r *SearchRuleReconciler) UpdateConditionPrometheusRuleMetricsNotExposed(se
 func (r *SearchRuleReconciler) UpdateConditionPrometheusRuleError(searchRule *v1alpha1.SearchRule, message string) {
 	condition := globals.NewCondition(globals.ConditionTypePrometheusRule, metav1.ConditionFalse,
 		globals.ConditionReasonPrometheusRuleErrorType, message)
+	globals.UpdateCondition(&searchRule.Status.Conditions, condition)
+}
+
+// UpdateConditionPrometheusRuleMetricNameMismatch warns the user that
+// `spec.prometheusRule.metricName` does not match any of the declared
+// `spec.customMetrics[*].name`. The alert is generated against the fallback
+// metric (the first customMetrics entry) so behaviour is deterministic, but
+// the user almost certainly intended a different gauge.
+func (r *SearchRuleReconciler) UpdateConditionPrometheusRuleMetricNameMismatch(searchRule *v1alpha1.SearchRule, message string) {
+	condition := globals.NewCondition(globals.ConditionTypePrometheusRule, metav1.ConditionTrue,
+		globals.ConditionReasonPrometheusRuleMetricNameMismatchType, message)
+	globals.UpdateCondition(&searchRule.Status.Conditions, condition)
+}
+
+// UpdateConditionPrometheusRuleCustomMetricsInvalid reports that one of the
+// declared `spec.customMetrics[*]` entries is structurally invalid (bad
+// metric name, bad label name, label name colliding with the operator's
+// reserved labels, …). The PrometheusRule is not generated until the
+// SearchRule is fixed because an invalid label name would crash the
+// Prometheus client at registration time.
+func (r *SearchRuleReconciler) UpdateConditionPrometheusRuleCustomMetricsInvalid(searchRule *v1alpha1.SearchRule, message string) {
+	condition := globals.NewCondition(globals.ConditionTypePrometheusRule, metav1.ConditionFalse,
+		globals.ConditionReasonPrometheusRuleCustomMetricsInvalidType, message)
 	globals.UpdateCondition(&searchRule.Status.Conditions, condition)
 }
 

@@ -92,6 +92,82 @@ spec:
                 - operator
                 - threshold
                 type: object
+              customMetrics:
+                description: |-
+                  CustomMetrics declares Prometheus gauges derived from the
+                  Elasticsearch response aggregations. Each entry produces one
+                  `searchrule_<Name>` metric with one sample per bucket of the
+                  referenced aggregation. Useful when a SearchRule's condition is built
+                  on top of a `max_bucket`/`min_bucket` aggregation and the alert needs
+                  to expose the dimension that the bucket grouped by.
+                items:
+                  description: |-
+                    CustomMetric exposes a Prometheus gauge derived from a list of buckets in
+                    the Elasticsearch response. The operator iterates AggregationMap (a gjson
+                    path to an array — typically a `terms` aggregation's `buckets`) and emits
+                    one sample per bucket with Labels mapped from the bucket fields and the
+                    numeric Value extracted from another path within the bucket. The metric
+                    is registered as `searchrule_<Name>` and always carries the additional
+                    labels `searchrule_namespace` and `rule` so multiple SearchRules can share
+                    the same custom metric name without collision.
+                  properties:
+                    aggregation_map:
+                      description: |-
+                        AggregationMap is a gjson path to an array of buckets, evaluated
+                        against the contents of the Elasticsearch response's top-level
+                        `aggregations` block (NOT the full response). For a query whose
+                        response is `{"aggregations": {"by_domain": {"buckets": [...]}}}`
+                        the right value is `by_domain.buckets`. If the path resolves to a
+                        single object instead of an array, the operator emits a single
+                        sample.
+                      type: string
+                    help:
+                      description: Help is the Prometheus HELP text. Defaults to a
+                        generic description.
+                      type: string
+                    labels:
+                      description: Labels are extracted from each bucket and attached
+                        to the sample.
+                      items:
+                        description: |-
+                          MetricLabel describes how to extract a single Prometheus label from each
+                          bucket emitted by a CustomMetric. Value is a gjson path resolved against
+                          the bucket object (e.g. `key`, `error_percentage.value`). When StaticValue
+                          is true, Value is emitted verbatim instead of being treated as a path —
+                          useful for tagging every sample of a metric with a constant label.
+                        properties:
+                          name:
+                            type: string
+                          staticValue:
+                            type: boolean
+                          value:
+                            type: string
+                        required:
+                        - name
+                        - value
+                        type: object
+                      type: array
+                    name:
+                      description: |-
+                        Name is the suffix of the Prometheus metric name. The exposed metric
+                        is `searchrule_<Name>`. Must match `[a-zA-Z_][a-zA-Z_0-9]*` and must
+                        not collide with the operator's reserved names (`value`, `state`).
+                      pattern: ^[a-zA-Z_][a-zA-Z_0-9]*$
+                      type: string
+                    value:
+                      description: |-
+                        Value is the gjson path inside a bucket whose numeric content is
+                        emitted as the gauge value. Defaults to `doc_count` when empty so a
+                        bare `terms` aggregation works without configuration; for pipeline
+                        aggregations such as `max_bucket` or `bucket_script`, set this
+                        explicitly to e.g. `error_percentage.value` or `value`.
+                      type: string
+                  required:
+                  - aggregation_map
+                  - name
+                  type: object
+                maxItems: 10
+                type: array
               description:
                 type: string
               elasticsearch:
@@ -137,6 +213,14 @@ spec:
                       type: string
                     description: Labels are merged into the alert labels.
                     type: object
+                  metricName:
+                    description: |-
+                      MetricName selects which entry of spec.customMetrics the generated
+                      PromQL targets when the SearchRule defines more than one. Must match
+                      one of customMetrics[*].name. When unset, the first custom metric is
+                      used. Ignored when customMetrics is empty (the legacy
+                      `searchrule_value` metric is used instead).
+                    type: string
                 required:
                 - enabled
                 type: object

@@ -105,12 +105,32 @@ spec:
   # prometheusRule:
   #   enabled: true
   #   alertName: HighErrorRate           # Optional, defaults to the SearchRule name
+  #   # metricName: akamai_5xx_by_host    # Optional, picks one customMetrics entry when several are declared
   #   labels:
   #     severity: warning
   #     team: platform
   #   annotations:
   #     summary: "High error rate detected"
   #     runbook_url: "https://runbooks.example.com/high-errors"
+
+  # Optional: expose Prometheus gauges built from the Elasticsearch response
+  # aggregations. One sample is emitted per bucket of the referenced
+  # aggregation, with labels mapped from each bucket. When customMetrics is
+  # set together with prometheusRule.enabled, the generated PromQL targets
+  # the first custom metric (or `prometheusRule.metricName` when set), so the
+  # alert in Alertmanager fires once per bucket over the threshold and
+  # inherits the per-bucket labels (e.g. `host="cp.freepik.com"`).
+  # customMetrics:
+  #   - name: akamai_5xx_by_host           # Final metric: searchrule_akamai_5xx_by_host
+  #     help: "Akamai 5xx percentage by host (last 5 minutes)"
+  #     aggregation_map: by_domain.buckets   # Relative to the response's `aggregations` block; do NOT prefix with `aggregations.`
+  #     labels:
+  #       - name: host                     # Label name on the Prometheus series
+  #         value: key                     # gjson path inside each bucket
+  #       - name: severity                 # Static label, same for every sample
+  #         value: critical
+  #         staticValue: true
+  #     value: error_percentage.value      # Defaults to `doc_count` when empty
 
   # RuleAction reference to execute when the condition is true.
   # Optional when `prometheusRule.enabled: true` is set; at least one of
