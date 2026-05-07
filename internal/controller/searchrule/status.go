@@ -178,6 +178,17 @@ func (r *SearchRuleReconciler) UpdateConditionPrometheusRuleError(searchRule *v1
 	globals.UpdateCondition(&searchRule.Status.Conditions, condition)
 }
 
+// UpdateConditionPrometheusRuleMetricNameMismatch warns the user that
+// `spec.prometheusRule.metricName` does not match any of the declared
+// `spec.customMetrics[*].name`. The alert is generated against the fallback
+// metric (the first customMetrics entry) so behaviour is deterministic, but
+// the user almost certainly intended a different gauge.
+func (r *SearchRuleReconciler) UpdateConditionPrometheusRuleMetricNameMismatch(searchRule *v1alpha1.SearchRule, message string) {
+	condition := globals.NewCondition(globals.ConditionTypePrometheusRule, metav1.ConditionTrue,
+		globals.ConditionReasonPrometheusRuleMetricNameMismatchType, message)
+	globals.UpdateCondition(&searchRule.Status.Conditions, condition)
+}
+
 // UpdateConditionMissingOutput reports that the SearchRule defines neither
 // actionRef nor prometheusRule and thus cannot produce any output.
 func (r *SearchRuleReconciler) UpdateConditionMissingOutput(searchRule *v1alpha1.SearchRule) {

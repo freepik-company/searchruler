@@ -101,9 +101,10 @@ func TestPromqlOperator(t *testing.T) {
 func TestChooseAlertMetric(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name string
-		rule *searchrulerv1alpha1.SearchRule
-		want string
+		name         string
+		rule         *searchrulerv1alpha1.SearchRule
+		want         string
+		wantFallback bool
 	}{
 		{
 			name: "no customMetrics falls back to legacy",
@@ -143,7 +144,7 @@ func TestChooseAlertMetric(t *testing.T) {
 			want: "searchrule_secondary",
 		},
 		{
-			name: "unknown MetricName falls back to first entry",
+			name: "unknown MetricName falls back to first entry and surfaces a reason",
 			rule: newSearchRule(func(r *searchrulerv1alpha1.SearchRule) {
 				r.Spec.CustomMetrics = []searchrulerv1alpha1.CustomMetric{
 					{Name: "primary"},
@@ -154,15 +155,20 @@ func TestChooseAlertMetric(t *testing.T) {
 					MetricName: "ghost",
 				}
 			}),
-			want: "searchrule_primary",
+			want:         "searchrule_primary",
+			wantFallback: true,
 		},
 	}
 	for _, c := range cases {
 		c := c
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			if got := chooseAlertMetric(c.rule); got != c.want {
+			got, fallback := chooseAlertMetric(c.rule)
+			if got != c.want {
 				t.Fatalf("got=%q want=%q", got, c.want)
+			}
+			if (fallback != "") != c.wantFallback {
+				t.Fatalf("fallback=%q wantFallback=%v", fallback, c.wantFallback)
 			}
 		})
 	}

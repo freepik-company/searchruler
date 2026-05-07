@@ -147,6 +147,15 @@ func (r *SearchRuleReconciler) reconcilePrometheusRule(ctx context.Context, rule
 	logger.V(1).Info("PrometheusRule reconciled",
 		"operation", op, "name", pr.Name, "namespace", pr.Namespace)
 
+	// Surface the unmatched metricName selector as a non-blocking warning
+	// in the status. The PrometheusRule was still created (using the
+	// fallback metric) so behavior is predictable, but the user gets a
+	// clear signal that the typo is silently routing to a different gauge.
+	if _, fallback := chooseAlertMetric(rule); fallback != "" {
+		r.UpdateConditionPrometheusRuleMetricNameMismatch(rule, fallback)
+		return nil
+	}
+
 	if !r.MetricsExposed {
 		r.UpdateConditionPrometheusRuleMetricsNotExposed(rule)
 		return nil
@@ -180,11 +189,13 @@ func buildAlertingRule(rule *v1alpha1.SearchRule, expr string, forDuration monit
 		labels = mergeLabels(labels, rule.Spec.PrometheusRule.Labels)
 	}
 
+	metric, _ := chooseAlertMetric(rule)
 	annotations := map[string]string{
 		"description": fmt.Sprintf(
-			"SearchRule %s/%s condition (%s %s %s) is firing on metric searchrule_value.",
+			"SearchRule %s/%s condition (%s %s %s) is firing on metric %s.",
 			rule.Namespace, rule.Name,
 			rule.Spec.Condition.Operator, "threshold", rule.Spec.Condition.Threshold,
+			metric,
 		),
 	}
 	if rule.Spec.PrometheusRule != nil {
@@ -230,7 +241,7 @@ func buildPromQLExpr(rule *v1alpha1.SearchRule) (string, error) {
 		return "", fmt.Errorf("condition.threshold %q is not a valid float: %w", rawThreshold, err)
 	}
 	thresholdStr := strconv.FormatFloat(threshold, 'f', -1, 64)
-	metric := chooseAlertMetric(rule)
+	metric, _ := chooseAlertMetric(rule)
 	// strconv.FormatFloat with -1 precision keeps the shortest representation
 	// that round-trips, so "100" stays "100" and "0.5" stays "0.5".
 	return fmt.Sprintf(`%s{searchrule_namespace=%q,rule=%q} %s %s`,
@@ -242,10 +253,15 @@ func buildPromQLExpr(rule *v1alpha1.SearchRule) (string, error) {
 // `searchrule_value`. With one entry, we use it. With several, we honour
 // `spec.prometheusRule.metricName` if it matches a declared name; otherwise
 // we default to the first one.
-func chooseAlertMetric(rule *v1alpha1.SearchRule) string {
+//
+// fallbackReason is non-empty when the chosen metric does not strictly match
+// what the user asked for (typo in metricName, etc). The caller surfaces it
+// as a status condition so the misconfiguration is visible instead of
+// silently routing alerts to the wrong gauge.
+func chooseAlertMetric(rule *v1alpha1.SearchRule) (metric, fallbackReason string) {
 	const legacy = "searchrule_value"
 	if len(rule.Spec.CustomMetrics) == 0 {
-		return legacy
+		return legacy, ""
 	}
 	preferred := ""
 	if rule.Spec.PrometheusRule != nil {
@@ -254,11 +270,17 @@ func chooseAlertMetric(rule *v1alpha1.SearchRule) string {
 	if preferred != "" {
 		for _, cm := range rule.Spec.CustomMetrics {
 			if cm.Name == preferred {
-				return "searchrule_" + cm.Name
+				return "searchrule_" + cm.Name, ""
 			}
 		}
+		// metricName was set but no customMetrics entry matched. Fall back
+		// to the first one and tell the caller so the SearchRule's status
+		// reflects the typo.
+		return "searchrule_" + rule.Spec.CustomMetrics[0].Name,
+			fmt.Sprintf("spec.prometheusRule.metricName=%q does not match any spec.customMetrics[*].name; falling back to %q",
+				preferred, rule.Spec.CustomMetrics[0].Name)
 	}
-	return "searchrule_" + rule.Spec.CustomMetrics[0].Name
+	return "searchrule_" + rule.Spec.CustomMetrics[0].Name, ""
 }
 
 // promqlOperator maps a SearchRule condition operator to its PromQL syntax.

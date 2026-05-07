@@ -97,6 +97,8 @@ const (
 	ConditionReasonPrometheusRuleErrorType    = "PrometheusRuleError"
 	ConditionReasonPrometheusRuleErrorMessage = "Failed to reconcile the PrometheusRule resource"
 
+	ConditionReasonPrometheusRuleMetricNameMismatchType = "MetricNameMismatch"
+
 	// At least one of actionRef or prometheusRule must be defined
 	ConditionReasonMissingOutputType    = "MissingOutput"
 	ConditionReasonMissingOutputMessage = "SearchRule has neither actionRef nor prometheusRule defined; at least one is required"

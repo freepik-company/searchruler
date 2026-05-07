@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -486,15 +485,4 @@ func equalSlices(a, b []string) bool {
 		}
 	}
 	return true
-}
-
-// orderedLabelKeys is exported only for tests so we can assert deterministic
-// label order without exposing the manager's internals.
-func orderedLabelKeys(m map[string]string) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	sort.Strings(out)
-	return out
 }
