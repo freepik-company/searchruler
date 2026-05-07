@@ -83,10 +83,13 @@ type CustomMetric struct {
 	// Help is the Prometheus HELP text. Defaults to a generic description.
 	Help string `json:"help,omitempty"`
 
-	// AggregationMap is a gjson path to an array of buckets in the
-	// Elasticsearch response, e.g. `aggregations.by_domain.buckets`. If the
-	// path resolves to a single object instead of an array, the operator
-	// emits a single sample.
+	// AggregationMap is a gjson path to an array of buckets, evaluated
+	// against the contents of the Elasticsearch response's top-level
+	// `aggregations` block (NOT the full response). For a query whose
+	// response is `{"aggregations": {"by_domain": {"buckets": [...]}}}`
+	// the right value is `by_domain.buckets`. If the path resolves to a
+	// single object instead of an array, the operator emits a single
+	// sample.
 	AggregationMap string `json:"aggregation_map"`
 
 	// Labels are extracted from each bucket and attached to the sample.

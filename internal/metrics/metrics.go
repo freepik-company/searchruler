@@ -287,7 +287,12 @@ func extractCustomSamples(aggregations interface{}, cm v1alpha1.CustomMetric) ([
 	}
 	root := gjson.GetBytes(raw, cm.AggregationMap)
 	if !root.Exists() {
-		return nil, false, fmt.Errorf("aggregation_map path %q not found in response", cm.AggregationMap)
+		hint := ""
+		if strings.HasPrefix(cm.AggregationMap, "aggregations.") {
+			hint = " (note: aggregation_map is evaluated against the contents of the response's `aggregations` block; drop the `aggregations.` prefix)"
+		}
+		return nil, false, fmt.Errorf("aggregation_map path %q not found in aggregations%s",
+			cm.AggregationMap, hint)
 	}
 	var buckets []gjson.Result
 	if root.IsArray() {

@@ -123,7 +123,7 @@ spec:
   # customMetrics:
   #   - name: akamai_5xx_by_host           # Final metric: searchrule_akamai_5xx_by_host
   #     help: "Akamai 5xx percentage by host (last 5 minutes)"
-  #     aggregation_map: aggregations.by_domain.buckets
+  #     aggregation_map: by_domain.buckets   # Relative to the response's `aggregations` block; do NOT prefix with `aggregations.`
   #     labels:
   #       - name: host                     # Label name on the Prometheus series
   #         value: key                     # gjson path inside each bucket

@@ -490,7 +490,7 @@ spec:
   customMetrics:
     - name: akamai_5xx_by_host          # exposes searchrule_akamai_5xx_by_host
       help: "Akamai 5xx percentage by host (last 5m)"
-      aggregation_map: aggregations.by_domain.buckets
+      aggregation_map: by_domain.buckets
       labels:
         - name: host
           value: key                    # gjson path inside each bucket
